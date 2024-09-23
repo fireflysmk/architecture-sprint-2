@@ -1,0 +1,239 @@
+name: mongo-sharding-repl
+services:
+  mongos_router:
+    image: mongo:latest
+    container_name: sharding-repl-mongos_router
+    restart: always
+    ports:
+      - "27020:27020"
+    volumes:
+      - router-data:/data/db
+      - router-config:/data/configdb
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.3
+    command: [
+        "mongos", #обычная mongo в режиме роутера
+        "--configdb",
+        "config_server/configSrv:27017", #передача данных сервера конфигурации
+        "--bind_ip_all",
+        "--port",
+        "27020",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  configSrv:
+    image: mongo:latest # docker образ
+    container_name: sharding-repl-configSrv
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.10
+    volumes:
+      - config-data:/data/db
+      - config-config:/data/configdb
+    command: [
+        "--configsvr", #запуск в режиме конфигурации
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27017",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  shard1-a:
+    image: mongo:latest
+    container_name: sharding-repl-shard1-a
+    restart: always
+    ports:
+      - "27028:27018"
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.9
+    volumes:
+      - shard1-a-data:/data/db
+      - shard1-a-config:/data/configdb
+    command: [
+        "--shardsvr", #запуск в режиме шардинга
+        "--replSet",
+        "shard1", #название реплики
+        "--bind_ip_all",
+        "--port",
+        "27018",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  shard1-b:
+    image: mongo:latest
+    container_name: sharding-repl-shard1-b
+    restart: always
+    ports:
+      - "27029:27018"
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.8
+    volumes:
+      - shard1-b-data:/data/db
+      - shard1-b-config:/data/configdb
+    command: [
+        "--shardsvr", #запуск в режиме шардинга
+        "--replSet",
+        "shard1", #название реплики
+        "--bind_ip_all",
+        "--port",
+        "27018",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  shard1-c:
+    image: mongo:latest
+    container_name: sharding-repl-shard1-c
+    restart: always
+    ports:
+      - "27030:27018"
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.7
+    volumes:
+      - shard1-c-data:/data/db
+      - shard1-c-config:/data/configdb
+    command: [
+        "--shardsvr", #запуск в режиме шардинга
+        "--replSet",
+        "shard1", #название реплики
+        "--bind_ip_all",
+        "--port",
+        "27018",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  #2-й шард
+  shard2-a:
+    image: mongo:latest
+    container_name: sharding-repl-shard2-a
+    restart: always
+    ports:
+      - "27031:27019"
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.6
+    volumes:
+      - shard2-a-data:/data/db
+      - shard2-a-config:/data/configdb
+    command: [
+        "--shardsvr", #запуск в режиме шардинга
+        "--replSet",
+        "shard2", #название реплик
+        "--bind_ip_all", # обратите внимание - она отличается от реплики 1-го шарда
+        "--port",
+        "27019",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  shard2-b:
+    image: mongo:latest
+    container_name: sharding-repl-shard2-b
+    restart: always
+    ports:
+      - "27032:27019"
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.5
+    volumes:
+      - shard2-b-data:/data/db
+      - shard2-b-config:/data/configdb
+    command: [
+        "--shardsvr", #запуск в режиме шардинга
+        "--replSet",
+        "shard2", #название реплик
+        "--bind_ip_all", # обратите внимание - она отличается от реплики 1-го шарда
+        "--port",
+        "27019",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  shard2-c:
+    image: mongo:latest
+    container_name: sharding-repl-shard2-c
+    restart: always
+    ports:
+      - "27033:27019"
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.4
+    volumes:
+      - shard2-c-data:/data/db
+      - shard2-c-config:/data/configdb
+    command: [
+        "--shardsvr", #запуск в режиме шардинга
+        "--replSet",
+        "shard2", #название реплик
+        "--bind_ip_all", # обратите внимание - она отличается от реплики 1-го шарда
+        "--port",
+        "27019",
+      ]
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  pymongo_api:
+    image: kazhem/pymongo_api:1.0.0
+    ports:
+      - 8080:8080
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.2
+    environment:
+      MONGODB_URL: "mongodb://mongos_router:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 173.18.0.0/16
+
+volumes:
+  config-data:
+  config-config:
+  router-data:
+  router-config:
+  shard1-a-data:
+  shard1-a-config:
+  shard1-b-data:
+  shard1-b-config:
+  shard1-c-data:
+  shard1-c-config:
+  shard2-a-data:
+  shard2-a-config:
+  shard2-b-data:
+  shard2-b-config:
+  shard2-c-data:
+  shard2-c-config:

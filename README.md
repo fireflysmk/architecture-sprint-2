@@ -5,31 +5,19 @@
 Запускаем mongodb и приложение
 
 ```shell
-docker compose up -d
+cd sharding-repl-cache && docker compose up -d && cd -
 ```
 
-Заполняем mongodb данными
+Инициализируем монго и заполняем данными
 
 ```shell
-./scripts/mongo-init.sh
+cd sharding-repl-cache && sh init.sh && cd -
 ```
 
 ## Как проверить
 
-### Если вы запускаете проект на локальной машине
-
 Откройте в браузере http://localhost:8080
-
-### Если вы запускаете проект на предоставленной виртуальной машине
-
-Узнать белый ip виртуальной машины
-
-```shell
-curl --silent http://ifconfig.me
-```
-
-Откройте в браузере http://<ip виртуальной машины>:8080
 
 ## Доступные эндпоинты
 
-Список доступных эндпоинтов, swagger http://<ip виртуальной машины>:8080/docs
+Список доступных эндпоинтов, swagger http://localhost:8080/docs
