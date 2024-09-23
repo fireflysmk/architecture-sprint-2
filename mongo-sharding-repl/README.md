@@ -1,4 +1,4 @@
-# mongo-sharding
+# mongo-sharding-repl
 
 ## Как запустить
 
@@ -18,6 +18,12 @@ docker compose up -d
 
 ```shell
 ./scripts/mongo-show-count-docs.sh
+```
+
+Смотрим общее кол-во реплик
+
+```shell
+./scripts/mongo-show-count-repl.sh
 ```
 
 ## Как проверить
