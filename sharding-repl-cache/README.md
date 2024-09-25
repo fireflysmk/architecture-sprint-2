@@ -1,10 +1,12 @@
-# Задание 1
+[Схема](task6.drawio)
 
-# Задание 2
+# Запуск приложения
 
-## Шардирование
+```bash
+docker-compose up -d
+```
 
-### Инициализация сервера конфигурации
+# Инициализация сервера конфигурации
 
 ```bash
 docker-compose exec -it configSrv mongosh --port 27017
@@ -22,9 +24,9 @@ rs.initiate(
 );
 ```
 
-### Инициализаци реплик
+# Инициализаци реплик
 
-#### Шард 1
+## Шард 1
 
 ```bash
 docker-compose exec -it shard1 mongosh --port 27018
@@ -38,7 +40,7 @@ rs.initiate({_id: "shard1", members: [
 ]})
 ```
 
-#### Шард 2
+## Шард 2
 
 ```bash
 docker-compose exec -it shard2 mongosh --port 27019
@@ -53,7 +55,7 @@ rs.initiate({_id: "shard2", members: [
 ```
 
 
-### Инициализация роутера
+# Инициализация роутера
 
 ```bash
 docker-compose exec -it mongos_router mongosh --port 27020
@@ -87,9 +89,9 @@ for(var i = 0; i < 1000; i++) db.helloDoc.insert({age:i, name:"ly"+i})
 db.helloDoc.countDocuments()
 ```
 
-### Проверка в шардах
+# Проверка в шардах
 
-#### Шард 1
+## Шард 1
 
 ```bash
 docker-compose exec -it shard1 mongosh --port 27018
@@ -100,7 +102,7 @@ use somedb;
 db.helloDoc.countDocuments();
 ```
 
-##### Реплика 2
+### Реплика 2
 
 ```bash
 docker-compose exec -it shard1 mongosh --port 27021
@@ -111,7 +113,7 @@ use somedb;
 db.helloDoc.countDocuments();
 ```
 
-##### Реплика 3
+### Реплика 3
 
 ```bash
 docker-compose exec -it shard1 mongosh --port 27022
@@ -122,7 +124,7 @@ use somedb;
 db.helloDoc.countDocuments();
 ```
 
-#### Шард 2
+## Шард 2
 
 ```bash
 docker-compose exec -it shard2 mongosh --port 27019
@@ -133,7 +135,7 @@ use somedb;
 db.helloDoc.countDocuments();
 ```
 
-##### Реплика 2
+### Реплика 2
 
 ```bash
 docker-compose exec -it shard2 mongosh --port 27023
@@ -144,7 +146,7 @@ use somedb;
 db.helloDoc.countDocuments();
 ```
 
-##### Реплика 3
+### Реплика 3
 
 ```bash
 docker-compose exec -it shard2 mongosh --port 27024
@@ -153,12 +155,6 @@ docker-compose exec -it shard2 mongosh --port 27024
 ```bash
 use somedb;
 db.helloDoc.countDocuments();
-```
-
-### Запуск приложения
-
-```bash
-docker-compose up -d pymongo_api
 ```
 
 Проверка [http://localhost:8080/](http://localhost:8080/)
