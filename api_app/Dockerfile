@@ -1,4 +1,4 @@
-FROM python:3.12.1-slim
+FROM --platform=linux/arm64/v8 python:3.12.1-slim
 WORKDIR /app
 EXPOSE 8080
 COPY requirements.txt ./
