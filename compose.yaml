@@ -98,6 +98,24 @@ services:
       interval: 5s
       start_period: 10s
 
+  pymongo_api:
+    container_name: pymongo_api
+    build:
+      context: ../api_app
+      dockerfile: ../Dockerfile
+    image: kazhem/pymongo_api:1.0.0
+    depends_on:
+      - mongos_router1
+    ports:
+      - 8000:8080
+      - 8086:8080
+    networks:
+      app-network:
+        ipv4_address: 173.18.0.40
+    environment:
+      MONGODB_URL: "mongodb://mongos_router1:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+
 volumes:
   config-data:
   shard1-data:
