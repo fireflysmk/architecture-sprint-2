@@ -1,0 +1,33 @@
+# Mongo-sharding
+
+Для уверенного запуска рекомендуется между шагами 1, 2, 3 и 4 делать паузу в 10 секунд для того, чтобы в mongo завершились все процессы инициализации.
+
+## 1. Запускаем кластер
+
+```shell
+docker compose up -d
+```
+
+## 2. Инициализируем ReplicaSet сервера конфигурации и шардов
+
+```shell
+./scripts/mongod-init.sh
+```
+
+## 3. Инициализируем mongos
+
+```shell
+./scripts/configure_mongos.sh
+```
+
+## 4. Наполнение данными
+
+```shell
+./scripts/add_data.sh
+```
+
+## 5. Проверка
+
+```shell
+./scripts/check.sh
+```
