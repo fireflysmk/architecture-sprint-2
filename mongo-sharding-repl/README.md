@@ -13,12 +13,6 @@ docker compose up -d
 ./scripts/InitServicesMongo.sh
 ```
 
-Заполняем mongodb данными
-
-```shell
-./scripts/mongo-init.sh
-```
-
 ## Как проверить
 
 Для проверки можно выполнить скрипт (в ответе будет общее кол-во записей и кол-во записей на каждом из шардов)

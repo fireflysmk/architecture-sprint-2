@@ -1,4 +1,4 @@
-docker exec configSrv mongosh --port 27022 <<EOF
+docker exec -it configSrv mongosh --port 27022 <<EOF
 rs.initiate(
   {
     _id : "config_server",
@@ -12,7 +12,7 @@ exit();
 EOF
  
 
-docker exec shard1 mongosh --port 27023 <<EOF
+docker exec -it shard1 mongosh --port 27023 <<EOF
 rs.initiate(
     {
       _id : "shard1",
@@ -25,7 +25,7 @@ rs.initiate(
 exit();
 EOF
 
-docker exec shard2 mongosh --port 27024 <<EOF
+docker exec -it shard2 mongosh --port 27024 <<EOF
 rs.initiate(
     {
       _id : "shard2",
@@ -37,10 +37,13 @@ rs.initiate(
 exit(); 
 EOF
 
-docker exec mongos_router mongosh --port 27025 <<EOF
+docker exec -it mongos_router mongosh --port 27025 <<EOF
 sh.addShard( "shard1/shard1:27023");
 sh.addShard( "shard2/shard2:27024");
 sh.enableSharding("somedb");
 sh.shardCollection("somedb.helloDoc", { "name" : "hashed" } )
+
+use somedb
+for(var i = 0; i < 1000; i++) db.helloDoc.insertOne({age:i, name:"ly"+i}); 
 exit();
 EOF 

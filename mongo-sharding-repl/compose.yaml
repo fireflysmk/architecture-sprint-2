@@ -9,7 +9,11 @@ services:
     depends_on:
       - configSrv
       - shard1
+      - shard1.1
+      - shard1.2
       - shard2
+      - shard2.1
+      - shard2.2
       - mongos_router
     ports:
       - 8080:8080

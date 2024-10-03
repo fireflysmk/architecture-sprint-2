@@ -1,4 +1,4 @@
-docker exec configSrv mongosh --port 27022 <<EOF
+docker exec -it configSrv mongosh --port 27022 <<EOF
 rs.initiate(
   {
     _id : "config_server",
@@ -12,7 +12,7 @@ exit();
 EOF
  
 
-docker exec shard1 mongosh --port 27023 <<EOF
+docker exec -it shard1 mongosh --port 27023 <<EOF
 rs.initiate(
     {
       _id : "shard1",
@@ -27,21 +27,21 @@ rs.initiate(
 exit();
 EOF
 
-docker exec shard2 mongosh --port 27024 <<EOF
+docker exec -it shard2 mongosh --port 27024 <<EOF
 rs.initiate(
     {
       _id : "shard2",
       members: [
-        { _id : 1, host : "shard2:27024" },
-		{ _id : 1, host : "shard2.1:27028" },
-		{ _id : 2, host : "shard2.2:27029" }
+        { _id : 3, host : "shard2:27024" },
+		{ _id : 4, host : "shard2.1:27028" },
+		{ _id : 5, host : "shard2.2:27029" }
       ]
     }
   ); 
 exit(); 
 EOF
 
-docker exec mongos_router mongosh --port 27025 <<EOF
+docker exec -it mongos_router mongosh --port 27025 <<EOF
 sh.addShard( "shard1/shard1:27023");
 sh.addShard( "shard1/shard1.1:27026");
 sh.addShard( "shard1/shard1.2:27027");
@@ -50,5 +50,8 @@ sh.addShard( "shard2/shard2.1:27028");
 sh.addShard( "shard2/shard2.2:27029");
 sh.enableSharding("somedb");
 sh.shardCollection("somedb.helloDoc", { "name" : "hashed" } )
+
+use somedb
+for(var i = 0; i < 1000; i++) db.helloDoc.insertOne({age:i, name:"ly"+i}); 
 exit();
 EOF 

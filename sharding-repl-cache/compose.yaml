@@ -9,8 +9,18 @@ services:
     depends_on:
       - configSrv
       - shard1
+      - shard1.1
+      - shard1.2
       - shard2
+      - shard2.1
+      - shard2.2
       - mongos_router
+      - redis_1
+      - redis_2
+      - redis_3
+      - redis_4
+      - redis_5
+      - redis_6
     ports:
       - 8080:8080
     networks:
@@ -19,6 +29,7 @@ services:
     environment:
       MONGODB_URL: "mongodb://mongos_router:27025"
       MONGODB_DATABASE_NAME: "somedb"
+      REDIS_URL: "redis://redis_1:6379"
       
   configSrv:
     image: mongo:latest 
@@ -304,7 +315,7 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 173.17.0.0/18
+        - subnet: 173.17.0.0/16
 
 volumes:
   config-data:
