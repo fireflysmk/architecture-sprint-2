@@ -7,15 +7,12 @@ from typing import List, Optional
 import motor.motor_asyncio
 from bson import ObjectId
 from fastapi import Body, FastAPI, HTTPException, status
-from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
-from fastapi_cache.decorator import cache
 from logmiddleware import RouterLoggingMiddleware, logging_config
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from pydantic.functional_validators import BeforeValidator
 from pymongo import errors
-from redis import asyncio as aioredis
 from typing_extensions import Annotated
+from aiocache import caches, cached
 
 # Configure JSON logging
 logging.config.dictConfig(logging_config)
@@ -31,20 +28,6 @@ DATABASE_URL = os.environ["MONGODB_URL"]
 DATABASE_NAME = os.environ["MONGODB_DATABASE_NAME"]
 REDIS_URL = os.getenv("REDIS_URL", None)
 
-
-def nocache(*args, **kwargs):
-    def decorator(func):
-        return func
-
-    return decorator
-
-
-if REDIS_URL:
-    cache = cache
-else:
-    cache = nocache
-
-
 client = motor.motor_asyncio.AsyncIOMotorClient(DATABASE_URL)
 db = client[DATABASE_NAME]
 
@@ -56,8 +39,15 @@ PyObjectId = Annotated[str, BeforeValidator(str)]
 @app.on_event("startup")
 async def startup():
     if REDIS_URL:
-        redis = aioredis.RedisCluster.from_url(REDIS_URL, encoding="utf8", decode_responses=True)
-        FastAPICache.init(RedisBackend(redis), prefix="api:cache")
+        caches.set_config({
+            "default": {
+                "cache": "aiocache.RedisCache",
+                "endpoint": REDIS_URL.split(",")[0],  # Use the first node in the cluster
+                "port": 6379,
+                "timeout": 5,
+                "cache_enabled": True,
+            }
+        })
 
 
 class UserModel(BaseModel):
@@ -80,12 +70,26 @@ class UserCollection(BaseModel):
 
 @app.get("/")
 async def root():
+    topology_description = client.topology_description
+    read_preference = client.client_options.read_preference
+    topology_type = topology_description.topology_type_name
+    replicaset_name = topology_description.replica_set_name
+
     collection_names = await db.list_collection_names()
     collections = {}
+    pipeline = [
+        { "$collStats": { "storageStats": {} } },
+        { "$group": { "_id": "$shard", "documents_count": { "$sum": "$storageStats.count" } } }
+    ]
     for collection_name in collection_names:
         collection = db.get_collection(collection_name)
+        counts_by_shards = []
+        cursor = collection.aggregate(pipeline)
+        async for document in cursor:
+            counts_by_shards.append(document)
         collections[collection_name] = {
-            "documents_count": await collection.count_documents({})
+            "documents_count": await collection.count_documents({}),
+            "documents_count_by_shards": counts_by_shards
         }
     try:
         replica_status = await client.admin.command("replSetGetStatus")
@@ -93,21 +97,27 @@ async def root():
     except errors.OperationFailure:
         replica_status = "No Replicas"
 
-    topology_description = client.topology_description
-    read_preference = client.client_options.read_preference
-    topology_type = topology_description.topology_type_name
-    replicaset_name = topology_description.replica_set_name
-
-    shards = None
+    shards = {}
     if topology_type == "Sharded":
         shards_list = await client.admin.command("listShards")
         shards = {}
         for shard in shards_list.get("shards", {}):
-            shards[shard["_id"]] = shard["host"]
+            shard_name = shard["_id"]
+            shard_host = shard["host"]
+            shards[shard_name] = {"host": shard_host}
 
-    cache_enabled = False
-    if REDIS_URL:
-        cache_enabled = FastAPICache.get_enable()
+            shard_hosts = shard_host.split("/")[1]
+            shard_client = motor.motor_asyncio.AsyncIOMotorClient(f"mongodb://{shard_hosts}")
+            try:
+                # Get replica set status
+                repl_set_status = await shard_client.admin.command("replSetGetStatus")
+                # Count the replicas (members of the replica set)
+                replica_count = len(repl_set_status.get("members", []))
+                shards[shard_name]["replica_count"] = replica_count
+            except Exception as e:
+                shards[shard_name]["replica_count"] = f"Error: {str(e)}"
+            finally:
+                shard_client.close()
 
     return {
         "mongo_topology_type": topology_type,
@@ -117,12 +127,12 @@ async def root():
         "mongo_nodes": client.nodes,
         "mongo_primary_host": client.primary,
         "mongo_secondary_hosts": client.secondaries,
-        "mongo_address": client.address,
+#         "mongo_address": client.address, # неприменимо при использовании нескольких роутеров, вызывает ошибку
         "mongo_is_primary": client.is_primary,
         "mongo_is_mongos": client.is_mongos,
         "collections": collections,
         "shards": shards,
-        "cache_enabled": cache_enabled,
+        "cache_enabled": REDIS_URL is not None,
         "status": "OK",
     }
 
@@ -142,7 +152,7 @@ async def collection_count(collection_name: str):
     response_model=UserCollection,
     response_model_by_alias=False,
 )
-@cache(expire=60 * 1)
+@cached(ttl=60)
 async def list_users(collection_name: str):
     """
     List all of the user data in the database.

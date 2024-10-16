@@ -56,7 +56,7 @@ PyObjectId = Annotated[str, BeforeValidator(str)]
 @app.on_event("startup")
 async def startup():
     if REDIS_URL:
-        redis = aioredis.RedisCluster.from_url(REDIS_URL, encoding="utf8", decode_responses=True)
+        redis = aioredis.from_url(REDIS_URL, encoding="utf8", decode_responses=True)
         FastAPICache.init(RedisBackend(redis), prefix="api:cache")
 
 
@@ -80,12 +80,26 @@ class UserCollection(BaseModel):
 
 @app.get("/")
 async def root():
+    topology_description = client.topology_description
+    read_preference = client.client_options.read_preference
+    topology_type = topology_description.topology_type_name
+    replicaset_name = topology_description.replica_set_name
+
     collection_names = await db.list_collection_names()
     collections = {}
+    pipeline = [
+        { "$collStats": { "storageStats": {} } },
+        { "$group": { "_id": "$shard", "documents_count": { "$sum": "$storageStats.count" } } }
+    ]
     for collection_name in collection_names:
         collection = db.get_collection(collection_name)
+        counts_by_shards = []
+        cursor = collection.aggregate(pipeline)
+        async for document in cursor:
+            counts_by_shards.append(document)
         collections[collection_name] = {
-            "documents_count": await collection.count_documents({})
+            "documents_count": await collection.count_documents({}),
+            "documents_count_by_shards": counts_by_shards
         }
     try:
         replica_status = await client.admin.command("replSetGetStatus")
@@ -93,17 +107,27 @@ async def root():
     except errors.OperationFailure:
         replica_status = "No Replicas"
 
-    topology_description = client.topology_description
-    read_preference = client.client_options.read_preference
-    topology_type = topology_description.topology_type_name
-    replicaset_name = topology_description.replica_set_name
-
-    shards = None
+    shards = {}
     if topology_type == "Sharded":
         shards_list = await client.admin.command("listShards")
         shards = {}
         for shard in shards_list.get("shards", {}):
-            shards[shard["_id"]] = shard["host"]
+            shard_name = shard["_id"]
+            shard_host = shard["host"]
+            shards[shard_name] = {"host": shard_host}
+
+            shard_hosts = shard_host.split("/")[1]
+            shard_client = motor.motor_asyncio.AsyncIOMotorClient(f"mongodb://{shard_hosts}")
+            try:
+                # Get replica set status
+                repl_set_status = await shard_client.admin.command("replSetGetStatus")
+                # Count the replicas (members of the replica set)
+                replica_count = len(repl_set_status.get("members", []))
+                shards[shard_name]["replica_count"] = replica_count
+            except Exception as e:
+                shards[shard_name]["replica_count"] = f"Error: {str(e)}"
+            finally:
+                shard_client.close()
 
     cache_enabled = False
     if REDIS_URL:
@@ -117,7 +141,7 @@ async def root():
         "mongo_nodes": client.nodes,
         "mongo_primary_host": client.primary,
         "mongo_secondary_hosts": client.secondaries,
-        "mongo_address": client.address,
+#         "mongo_address": client.address, # неприменимо при использовании нескольких роутеров, вызывает ошибку
         "mongo_is_primary": client.is_primary,
         "mongo_is_mongos": client.is_mongos,
         "collections": collections,
