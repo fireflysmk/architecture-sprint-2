@@ -33,3 +33,21 @@ curl --silent http://ifconfig.me
 ## Доступные эндпоинты
 
 Список доступных эндпоинтов, swagger http://<ip виртуальной машины>:8080/docs
+
+## sprint2.sh
+
+Этот скрипт будет использоваться для выполнения и проверки заданий этого спринта.
+```
+$ ./sprint2.sh -h
+Usage:
+  ./sprint2.sh -t <task_num> [-m <mode>] [-h] [-b] [-c] [-i] [-l] [-r num_doc]
+Where
+  -t task_num       -            task number from this sprint (1..6)
+  -m mode           - (optional) containers' mode (one of 'up' or 'down')
+  -b                - (optional) conduct benchmarks
+  -c                - (optional) count number of documents in DB
+  -i                - (optional) init DB configuration
+  -l                - (optional) list container names
+  -r num_doc        - (optional) recreate collection with num_doc documents
+  -h                - (optional) this help
+```
