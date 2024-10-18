@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 
-TOP=`dirname $0`
+TOP_DIR=`pwd`/`dirname $0`
 TASK_DIRS=(mongo-single mongo-sharding mongo-sharding-repl sharding-repl-cache sharding-repl-cache-apisix sharding-repl-cache-cdn)
 TASK=""
 MODE=""
 BENCHMARK=0
 COUNT=0
+SELECT=0
 LIST_CONTAINERS=0
 INIT_COLLECTION=""
+
 AB=`which ab`
-TEST_TIME=20
-TEST_CONC=25
+SIEGE=`which siege`
+TEST_TIME=60
+TEST_CONC=5
+URLS_FILE=${TOP_DIR}/urls.lst
+
 DB_NAME=somedb
 COLLECTION_NAME=helloDoc
 
@@ -20,59 +25,67 @@ ROUTER_SRV=mongos_router
 SHARD1_SRV=shard1
 SHARD2_SRV=shard2
 
-# Could use yq, but there is guarantee that everyone has it
+# Could use yq here, but there is no guarantee that everyone has it
 ROUTER_PORT=27017
 SHARD1_PORT=27018
 SHARD2_PORT=27019
 CONFIG_PORT=27020
 
-TOP_URL="http://localhost:8080"
+TOP_URL="http://127.0.0.1:8080"
 
 
-usage() {
+function usage() {
     echo "Usage:"
-    echo "  $0 -t <task_num> [-m <mode>] [-h] [-b] [-c] [-i] [-l] [-r num_doc]"
+    echo "  $0 -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r num_doc] [-s]"
     echo "Where"
-    echo "  -t task_num       -            task number from this sprint (1..6)"
-    echo "  -m mode           - (optional) containers' mode (one of 'up' or 'down')"
-    echo "  -b                - (optional) conduct benchmarks"
-    echo "  -c                - (optional) count number of documents in DB"
-    echo "  -i                - (optional) init DB configuration"
-    echo "  -l                - (optional) list container names"
-    echo "  -r num_doc        - (optional) recreate collection with num_doc documents"
-
-    echo "  -h                - (optional) this help"
+    echo "  -t task_num -            task number from this sprint (1..6)"
+    echo "  -m mode     - (optional) containers' mode (one of 'up' or 'down')"
+    echo "  -b seconds  - (optional) conduct benchmarks with duration of specified number of seconds"
+    echo "  -c          - (optional) count number of documents in DB"
+    echo "  -i          - (optional) init DB configuration"
+    echo "  -l          - (optional) list container names"
+    echo "  -r num_doc  - (optional) recreate collection with num_doc documents"
+    echo "  -s num_doc  - (optional) select num_doc from each shard for better benchmarking"
+    echo
+    echo "  -h          - (optional) this help"
 }
 
-error() {
+
+function error() {
     echo $1
     exit 2
 }
 
-start_containers() {
+
+function start_containers() {
     echo "Staring containers..."
     cd $TASK_DIR
     docker compose up -d
     cd - > /dev/null
 }
 
-stop_containers() {
+
+function stop_containers() {
     echo "Stopping containers..."
     cd $TASK_DIR
     docker compose down
     cd - > /dev/null
 }
 
-list_containers() {
+
+function list_containers() {
     echo "This compose.yaml defines following containers:"
     grep "container_name" ${TASK_DIR}/compose.yaml | awk -F: '{print $2}'
 }
 
-init_db_config() {
+
+function init_db_config() {
     echo "Init DB config..."
     docker ps
+    [ "$TASK" == "1" ] && return
+
     cd $TASK_DIR
-    docker compose exec -T $CONFIG_SRV mongosh --port $CONFIG_PORT --quiet <<- EOF
+    docker compose exec -T $CONFIG_SRV mongosh --port $CONFIG_PORT --quiet > /dev/null <<- EOF
         rs.initiate(
             {
                 _id : "$CONFIG_NAME",
@@ -85,7 +98,7 @@ init_db_config() {
 EOF
     echo "Give few seconds to $CONFIG_SRV to digest the change in its config..."
     sleep 10
-    docker compose exec -T $SHARD1_SRV mongosh --port $SHARD1_PORT --quiet <<- EOF
+    docker compose exec -T $SHARD1_SRV mongosh --port $SHARD1_PORT --quiet > /dev/null <<- EOF
         rs.initiate(
             {
                 _id : "$SHARD1_SRV",
@@ -98,7 +111,7 @@ EOF
         use $DB_NAME;
         db.dropDatabase()
 EOF
-    docker compose exec -T $SHARD2_SRV mongosh --port $SHARD2_PORT --quiet <<- EOF
+    docker compose exec -T $SHARD2_SRV mongosh --port $SHARD2_PORT --quiet > /dev/null <<- EOF
         rs.initiate(
             {
                 _id : "$SHARD2_SRV",
@@ -111,7 +124,7 @@ EOF
         use $DB_NAME;
         db.dropDatabase()
 EOF
-    docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT <<- EOF
+    docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT > /dev/null <<- EOF
         sh.addShard( "$SHARD1_SRV/$SHARD1_SRV:$SHARD1_PORT");
         sh.addShard( "$SHARD2_SRV/$SHARD2_SRV:$SHARD2_PORT");
 
@@ -123,24 +136,25 @@ EOF
     docker ps
 }
 
-init_collection() {
+
+function init_collection() {
     echo "Initialize DB with ${INIT_COLLECTION} documents..."
     cd $TASK_DIR
     [ "$TASK" == "1" ] && ROUTER_SRV=mongodb1
 
-    OUTPUT=`docker compose exec -T $ROUTER_SRV mongosh --port 27017 --quiet <<- EOF
+    docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT --quiet > /dev/null <<- EOF
         use $DB_NAME
         db.$COLLECTION_NAME.drop()
-EOF`
+EOF
 
     if [ "$TASK" != 1 ]; then
-        OUTPUT=`docker compose exec -T $ROUTER_SRV mongosh --port 27017 --quiet <<- EOF
+        docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT --quiet > /dev/null <<- EOF
             sh.enableSharding("$DB_NAME");
             sh.shardCollection("$DB_NAME.$COLLECTION_NAME", { "name" : "hashed" } )
-EOF`
+EOF
     fi
 
-    OUTPUT=`docker compose exec -T $ROUTER_SRV mongosh --port 27017 --quiet <<- EOF
+    OUTPUT=`docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT --quiet <<- EOF
         use $DB_NAME
         for(var i = 0; i < ${INIT_COLLECTION}; i++) db.$COLLECTION_NAME.insertOne({age:i, name:"ly"+i})
         print("Count: " + db.$COLLECTION_NAME.countDocuments())
@@ -149,12 +163,13 @@ EOF`
     cd - > /dev/null
 }
 
-count_documents() {
+
+function count_documents() {
     echo "Count documents in DB..."
     cd $TASK_DIR
     [ "$TASK" == "1" ] && ROUTER_SRV=mongodb1
 
-    OUTPUT=`docker compose exec -T $ROUTER_SRV mongosh --port 27017 --quiet <<- EOF
+    OUTPUT=`docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT --quiet <<- EOF
         use $DB_NAME
         print("Count: " + db.$COLLECTION_NAME.countDocuments())
 EOF`
@@ -175,31 +190,74 @@ EOF`
     cd - > /dev/null
 }
 
-benchmark() {
+
+function select_data() {
+    echo "Selecting data sample from each shard..."
+    cd $TASK_DIR
+    if [ "$TASK" == "1" ]; then
+        ROUTER_SRV=mongodb1
+        OUTPUT=`docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT --quiet <<- EOF
+            use $DB_NAME;
+            db.$COLLECTION_NAME.find({}).limit($SELECT).forEach(function(a){print('$TOP_URL/$COLLECTION_NAME/users/'+a.name)});
+EOF`
+        echo $OUTPUT | awk '{for (i=1; i<=NF; i++) if ($i ~ /http/) print $i}' | tee $URLS_FILE
+    else
+        echo "Some documents on $SHARD1_SRV:"
+        OUTPUT=`docker compose exec -T $SHARD1_SRV mongosh --port $SHARD1_PORT --quiet <<- EOF
+            use $DB_NAME;
+            db.$COLLECTION_NAME.find({}).limit($SELECT).forEach(function(a){print('$TOP_URL/$COLLECTION_NAME/users/'+a.name)});
+EOF`
+        echo $OUTPUT | awk '{for (i=1; i<=NF; i++) if ($i ~ /http/) print $i}' | tee $URLS_FILE
+
+        echo "Some documents on $SHARD2_SRV:"
+        OUTPUT=`docker compose exec -T $SHARD2_SRV mongosh --port $SHARD2_PORT --quiet <<- EOF
+            use $DB_NAME;
+            db.$COLLECTION_NAME.find({}).limit($SELECT).forEach(function(a){print('$TOP_URL/$COLLECTION_NAME/users/'+a.name)});
+EOF`
+        echo $OUTPUT | awk '{for (i=1; i<=NF; i++) if ($i ~ /http/) print $i}' | tee -a $URLS_FILE
+    fi
+    cd - > /dev/null
+}
+
+
+function benchmark() {
     echo "Benchmarking..."
     URL1=$TOP_URL/
     URL2=$TOP_URL/$COLLECTION_NAME/users
-    if [ "a$AB" != "a" ]; then
+    if [ "a$SIEGE" != "a" ]; then
+        GREP="Transaction|Throughput|Response"
+        SIEGE_LOG="./siege.log"
+        BENCH1="siege -b -c ${TEST_CONC} -t ${TEST_TIME}s --rc=/dev/null $URL1"
+        echo $BENCH1; $BENCH1 > $SIEGE_LOG 2>&1; egrep -i "$GREP" $SIEGE_LOG
+        BENCH2="siege -b -c ${TEST_CONC} -t ${TEST_TIME}s --rc=/dev/null $URL2"
+        echo $BENCH2; $BENCH2 > $SIEGE_LOG 2>&1; egrep -i "$GREP" $SIEGE_LOG
+        BENCH3="siege -b -c ${TEST_CONC} -t ${TEST_TIME}s --rc=/dev/null --file=$URLS_FILE"
+        echo $BENCH3; $BENCH3 > $SIEGE_LOG 2>&1; egrep -i "$GREP" $SIEGE_LOG
+        rm $SIEGE_LOG
+    elif [ "a$AB" != "a" ]; then
+        GREP="Requests|90%"
         BENCH1="ab -c ${TEST_CONC} -t ${TEST_TIME} $URL1"
+        echo $BENCH1; $BENCH1 2>/dev/null | egrep -i "$GREP"
         BENCH2="ab -c ${TEST_CONC} -t ${TEST_TIME} $URL2"
+        echo $BENCH2; $BENCH2 2>/dev/null | egrep -i "$GREP"
     else
         echo "Can't find benchmark tool. No 'ab' or 'siege' found"
         exit 1
     fi
-    echo $BENCH1; $BENCH1 | egrep "Requests|90%"
-    echo
-    echo $BENCH2; $BENCH2 | egrep "Requests|90%"
 }
 
 
+# ================================= MAIN =====================================
 if [ $# -eq 0 ]; then
     usage
     exit 1
 fi
-while getopts ":t:m:bchilr:" opt; do
+
+while getopts ":t:m:b:chilr:s:" opt; do
     case ${opt} in
         b) # benchmark
             BENCHMARK=1
+            TEST_TIME=${OPTARG}
             ;;
         c) # count number of documents in DB
             COUNT=1
@@ -219,6 +277,9 @@ while getopts ":t:m:bchilr:" opt; do
             ;;
         r) # rebuild collection
             INIT_COLLECTION=${OPTARG}
+            ;;
+        s) # select sample data
+            SELECT=${OPTARG}
             ;;
         t) # task
             TASK=${OPTARG}
@@ -262,6 +323,7 @@ echo "Executing Task #${TASK}, working directory '${TASK_DIR}'"
 [ "$COUNT" == "1" ]            && count_documents
 [ "$BENCHMARK" == "1" ]        && benchmark
 [ "$LIST_CONTAINERS" == "1" ]  && list_containers
+[ "$SELECT" != "0" ]           && select_data
 
 echo "Done"
 exit 0

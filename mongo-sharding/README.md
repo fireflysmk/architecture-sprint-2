@@ -12,138 +12,85 @@ MongoDB. В данном случае это уже клстер, состящи
 Для упрощения выполнения и проверки задания в корневом подкаталоге этого
 репозитория создан скрипт ```sprint2.sh``` (см. описание в [README](../README.md#sprint2sh)).
 
-## Метрики конфигурации
+## Метрики этой конфигурации
 
 ```
 This collection has  2000  documents in total
 This collection has  1016  documents on  shard1
 This collection has  984  documents on  shard2
 
-ab -c 25 -t 20 http://localhost:8080/
-Finished 4617 requests
-Requests per second:    230.78 [#/sec] (mean)
-  90%    128
-
-ab -c 25 -t 20 http://localhost:8080/helloDoc/users
-Finished 3 requests
-Requests per second:    0.13 [#/sec] (mean)
-  90%  22828
+siege -b -c 5 -t 60s --rc=/dev/null http://127.0.0.1:8080/
+Transactions:                  12079 hits
+Response time:                  0.02 secs
+Transaction rate:             209.52 trans/sec
+Throughput:                     0.09 MB/sec
+Successful transactions:       12079
+Failed transactions:               0
+Longest transaction:            0.10
+Shortest transaction:           0.01
+siege -b -c 5 -t 60s --rc=/dev/null http://127.0.0.1:8080/helloDoc/users
+Transactions:                     56 hits
+Response time:                  5.16 secs
+Transaction rate:               0.95 trans/sec
+Throughput:                     0.05 MB/sec
+Successful transactions:          56
+Failed transactions:               0
+Longest transaction:            8.08
+Shortest transaction:           4.04
+siege -b -c 5 -t 60s --rc=/dev/null --file=/home/boris/repos/architecture-sprint-2/./urls.lst
+Transactions:                  25027 hits
+Response time:                  0.01 secs
+Transaction rate:             428.40 trans/sec
+Throughput:                     0.02 MB/sec
+Successful transactions:       25027
+Failed transactions:               0
+Longest transaction:            2.52
+Shortest transaction:           0.00
 ```
 
 ## Проверка задания
 
 Запускаем контейнеры:
 ```
-./sprint2.sh -t 2 -m up
+$ ./sprint2.sh -t 2 -m up
 Executing Task #2, working directory 'mongo-sharding'
 Staring containers...
-[+] Running 6/6
- ✔ Network mongo-sharding_app-network  Created                              0.1s
- ✔ Container configSrv                 Started                              0.1s
- ✔ Container mongos_router             Started                              0.1s
- ✔ Container shard1                    Started                              0.1s
- ✔ Container shard2                    Started                              0.1s
- ✔ Container pymongo_api               Started                              0.1s
-Done```
+[+] Running 10/10
+ ✔ Network mongo-sharding_app-network   Created                             0.3s
+ ✔ Volume "mongo-sharding_shard1-data"  Created                             0.0s
+ ✔ Volume "mongo-sharding_shard2-data"  Created                             0.0s
+ ✔ Volume "mongo-sharding_config-data"  Created                             0.0s
+ ✔ Volume "mongo-sharding_router-data"  Created                             0.0s
+ ✔ Container shard2                     Started                             0.1s
+ ✔ Container configSrv                  Started                             0.1s
+ ✔ Container mongos_router              Started                             0.1s
+ ✔ Container shard1                     Started                             0.1s
+ ✔ Container pymongo_api                Started                             0.1s
+Done
+```
 
-Инициализируем настройку кластера:
+Инициализируем настройку кластера (обращаем внимание на изменение статуса контейнеров
+с unhealthy на healthy):
 ```
 $ ./sprint2.sh -t 2 -i
 Executing Task #2, working directory 'mongo-sharding'
 Init DB config...
-CONTAINER ID   IMAGE                      COMMAND                  CREATED         STATUS                     PORTS
-                   NAMES
-c1f23dde61aa   kazhem/pymongo_api:1.0.0   "uvicorn app:app --h…"   2 minutes ago   Up 2 minutes               0.0.0.0:8080->8080/tcp, :::8080->8080/tcp                  pymongo_api
-b99d0ef63dfb   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)     27017/tcp, 0.0.0.0:27020->27020/tcp, :::27020->27020/tcp   configSrv
-4c5a31938efb   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (unhealthy)   0.0.0.0:27017->27017/tcp, :::27017->27017/tcp              mongos_router
-3fd61c350cc4   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (unhealthy)   27017/tcp, 0.0.0.0:27018->27018/tcp, :::27018->27018/tcp   shard1
-9ea95ec518cc   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (unhealthy)   27017/tcp, 0.0.0.0:27019->27019/tcp, :::27019->27019/tcp   shard2
-test> ... ... ... ... ... ... ... ... {
-  ok: 1,
-  '$clusterTime': {
-    clusterTime: Timestamp({ t: 1729230283, i: 1 }),
-    signature: {
-      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
-      keyId: Long('0')
-    }
-  },
-  operationTime: Timestamp({ t: 1729230283, i: 1 })
-}
-config_server [direct: secondary] test> Give few seconds to configSrv to digest the change in its config...
-MongoServerError[AlreadyInitialized]: already initialized. ... Uncaught
-shard1 [direct: primary] test> switched to db somedb
-shard1 [direct: primary] somedb> { ok: 1, dropped: 'somedb' }
-MongoServerError[AlreadyInitialized]: already initialized test> ... ... ... ... ... ... ... ... Uncaught
-shard2 [direct: primary] test> switched to db somedb
-shard2 [direct: primary] somedb> { ok: 1, dropped: 'somedb' }
-shard2 [direct: primary] somedb> Current Mongosh Log ID:        6711f5d75d711e36d3fe6910
-Connecting to:          mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.3.2
-Using MongoDB:          8.0.1
-Using Mongosh:          2.3.2
-
-For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
-
-------
-   The server generated these startup warnings when booting
-   2024-10-18T05:42:37.884+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
-------
-
-[direct: mongos] test> {
-  shardAdded: 'shard1',
-  ok: 1,
-  '$clusterTime': {
-    clusterTime: Timestamp({ t: 1729230296, i: 22 }),
-    signature: {
-      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
-      keyId: Long('0')
-    }
-  },
-  operationTime: Timestamp({ t: 1729230296, i: 22 })
-}
-[direct: mongos] test> {
-  shardAdded: 'shard2',
-  ok: 1,
-  '$clusterTime': {
-    clusterTime: Timestamp({ t: 1729230296, i: 45 }),
-    signature: {
-      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
-      keyId: Long('0')
-    }
-  },
-  operationTime: Timestamp({ t: 1729230296, i: 39 })
-}
-[direct: mongos] test>
-[direct: mongos] test> {
-  ok: 1,
-  '$clusterTime': {
-    clusterTime: Timestamp({ t: 1729230296, i: 52 }),
-    signature: {
-      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
-      keyId: Long('0')
-    }
-  },
-  operationTime: Timestamp({ t: 1729230296, i: 50 })
-}
-[direct: mongos] test> {
-  collectionsharded: 'somedb.helloDoc',
-  ok: 1,
-  '$clusterTime': {
-    clusterTime: Timestamp({ t: 1729230296, i: 101 }),
-    signature: {
-      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
-      keyId: Long('0')
-    }
-  },
-  operationTime: Timestamp({ t: 1729230296, i: 101 })
-}
-[direct: mongos] test> Server configuration is complete!
+CONTAINER ID   IMAGE                      COMMAND                  CREATED              STATUS                          PORTS
+                             NAMES
+3de22007460f   kazhem/pymongo_api:1.0.0   "uvicorn app:app --h…"   About a minute ago   Up About a minute               0.0.0.0:8080->8080/tcp, :::8080->8080/tcp                  pymongo_api
+839c5a7ef3e8   mongo:latest               "docker-entrypoint.s…"   About a minute ago   Up About a minute (healthy)     27017/tcp, 0.0.0.0:27018->27018/tcp, :::27018->27018/tcp   shard1
+b3c1a9b4e119   mongo:latest               "docker-entrypoint.s…"   About a minute ago   Up About a minute (unhealthy)   0.0.0.0:27017->27017/tcp, :::27017->27017/tcp              mongos_router
+a8ee0da5e785   mongo:latest               "docker-entrypoint.s…"   About a minute ago   Up About a minute (healthy)     27017/tcp, 0.0.0.0:27019->27019/tcp, :::27019->27019/tcp   shard2
+e73b6f61ff34   mongo:latest               "docker-entrypoint.s…"   About a minute ago   Up About a minute (healthy)     27017/tcp, 0.0.0.0:27020->27020/tcp, :::27020->27020/tcp   configSrv
+Give few seconds to configSrv to digest the change in its config...
+Server configuration is complete!
 CONTAINER ID   IMAGE                      COMMAND                  CREATED         STATUS                   PORTS
                  NAMES
-c1f23dde61aa   kazhem/pymongo_api:1.0.0   "uvicorn app:app --h…"   2 minutes ago   Up 2 minutes             0.0.0.0:8080->8080/tcp, :::8080->8080/tcp                  pymongo_api
-b99d0ef63dfb   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27020->27020/tcp, :::27020->27020/tcp   configSrv
-4c5a31938efb   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   0.0.0.0:27017->27017/tcp, :::27017->27017/tcp              mongos_router
-3fd61c350cc4   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27018->27018/tcp, :::27018->27018/tcp   shard1
-9ea95ec518cc   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27019->27019/tcp, :::27019->27019/tcp   shard2
+3de22007460f   kazhem/pymongo_api:1.0.0   "uvicorn app:app --h…"   2 minutes ago   Up 2 minutes             0.0.0.0:8080->8080/tcp, :::8080->8080/tcp                  pymongo_api
+839c5a7ef3e8   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27018->27018/tcp, :::27018->27018/tcp   shard1
+b3c1a9b4e119   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   0.0.0.0:27017->27017/tcp, :::27017->27017/tcp              mongos_router
+a8ee0da5e785   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27019->27019/tcp, :::27019->27019/tcp   shard2
+e73b6f61ff34   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27020->27020/tcp, :::27020->27020/tcp   configSrv
 Done
 ```
 
@@ -164,22 +111,62 @@ Count documents in DB...
 This collection has  2000  documents in total
 This collection has  1016  documents on  shard1
 This collection has  984  documents on  shard2
-Done```
+Done
+```
+
+Выберем несколько документов с каждого шарда (это действие одновременно
+сформирует файл urls.lst для использования в нагрузочном тесте):
+```
+$ ./sprint2.sh -t 2 -s 5
+Executing Task #2, working directory 'mongo-sharding'
+Selecting data sample from each shard...
+Some documents on shard1:
+http://127.0.0.1:8080/helloDoc/users/ly0
+http://127.0.0.1:8080/helloDoc/users/ly1
+http://127.0.0.1:8080/helloDoc/users/ly2
+http://127.0.0.1:8080/helloDoc/users/ly3
+http://127.0.0.1:8080/helloDoc/users/ly4
+Some documents on shard2:
+http://127.0.0.1:8080/helloDoc/users/ly6
+http://127.0.0.1:8080/helloDoc/users/ly7
+http://127.0.0.1:8080/helloDoc/users/ly9
+http://127.0.0.1:8080/helloDoc/users/ly11
+http://127.0.0.1:8080/helloDoc/users/ly12
+Done
+```
 
 Запускаем нагрузочный тест:
 ```
-$ ./sprint2.sh -t 2 -b
+$ ./sprint2.sh -t 2 -b 60
 Executing Task #2, working directory 'mongo-sharding'
 Benchmarking...
-ab -c 25 -t 20 http://localhost:8080/
-Finished 4617 requests
-Requests per second:    230.78 [#/sec] (mean)
-  90%    128
-
-ab -c 25 -t 20 http://localhost:8080/helloDoc/users
-Finished 3 requests
-Requests per second:    0.13 [#/sec] (mean)
-  90%  22828
+siege -b -c 5 -t 60s --rc=/dev/null http://127.0.0.1:8080/
+Transactions:                  12079 hits
+Response time:                  0.02 secs
+Transaction rate:             209.52 trans/sec
+Throughput:                     0.09 MB/sec
+Successful transactions:       12079
+Failed transactions:               0
+Longest transaction:            0.10
+Shortest transaction:           0.01
+siege -b -c 5 -t 60s --rc=/dev/null http://127.0.0.1:8080/helloDoc/users
+Transactions:                     56 hits
+Response time:                  5.16 secs
+Transaction rate:               0.95 trans/sec
+Throughput:                     0.05 MB/sec
+Successful transactions:          56
+Failed transactions:               0
+Longest transaction:            8.08
+Shortest transaction:           4.04
+siege -b -c 5 -t 60s --rc=/dev/null --file=/home/boris/repos/architecture-sprint-2/./urls.lst
+Transactions:                  25027 hits
+Response time:                  0.01 secs
+Transaction rate:             428.40 trans/sec
+Throughput:                     0.02 MB/sec
+Successful transactions:       25027
+Failed transactions:               0
+Longest transaction:            2.52
+Shortest transaction:           0.00
 Done
 ```
 
@@ -197,3 +184,7 @@ Stopping containers...
  ✔ Network mongo-sharding_app-network  Removed                              0.7s
 Done
 ```
+
+Для чистоты эксперимента перед повторным запуском всех вышеперечисленных
+действий на этом этапе рекомендуется удалить все файлы данных через
+```docker volume prune```, ```docker volume ls```, ```docker volume rm ...```.

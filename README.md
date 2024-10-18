@@ -34,20 +34,42 @@ curl --silent http://ifconfig.me
 
 Список доступных эндпоинтов, swagger http://<ip виртуальной машины>:8080/docs
 
+## Главная цель заданий этого спринта
+
+В этом спринте мы изучили различные техники повышения производительности
+приложения, которые могут использоваться на "административном" уровне. То есть
+без внесения изменений в код самого приложения. К сожалению, в текстах и
+упражнениях этого спринта была слабо подчеркнута немаловажная роль такого
+подхода. Мы зачем-то создавали сервисы на Yandex Cloud, смотрели на картинку
+с квадратиками новых виптуальных машин и связями между ними, но главного мы
+так и не сделали - доказать, что эта игра действительно стоит свеч. Для того,
+чтобы заполнить эту нишу знаний и будет использованы задания этого спринта.
+
+Сразу скажу, что запускать все я буду под Windows 10 + WSL2 + Ubuntu 22.04 на
+моем стареньком лаптопе, поэтому Ваши данные запросто могут отличаться от моих.
+
+Для определения эффекта от внедрения каждого нового уровня (задания спринта)
+будем выполнять нагрузочный тест с помощью инструмента ```siege```, который
+умеет делать запросы по списку URL из файла, а этот файл будет сформирован
+таким образом, чтобы запросы были распределены по всем участникам каждой
+новой конфигурации.
+
 ## sprint2.sh
 
 Этот скрипт будет использоваться для выполнения и проверки заданий этого спринта.
 ```
 $ ./sprint2.sh -h
 Usage:
-  ./sprint2.sh -t <task_num> [-m <mode>] [-h] [-b] [-c] [-i] [-l] [-r num_doc]
+  ./sprint2.sh -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r num_doc] [-s]
 Where
-  -t task_num       -            task number from this sprint (1..6)
-  -m mode           - (optional) containers' mode (one of 'up' or 'down')
-  -b                - (optional) conduct benchmarks
-  -c                - (optional) count number of documents in DB
-  -i                - (optional) init DB configuration
-  -l                - (optional) list container names
-  -r num_doc        - (optional) recreate collection with num_doc documents
-  -h                - (optional) this help
+  -t task_num -            task number from this sprint (1..6)
+  -m mode     - (optional) containers' mode (one of 'up' or 'down')
+  -b seconds  - (optional) conduct benchmarks with duration of specified number of seconds
+  -c          - (optional) count number of documents in DB
+  -i          - (optional) init DB configuration
+  -l          - (optional) list container names
+  -r num_doc  - (optional) recreate collection with num_doc documents
+  -s num_doc  - (optional) select num_doc from each shard for better benchmarking
+
+  -h          - (optional) this help
 ```
