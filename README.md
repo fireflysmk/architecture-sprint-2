@@ -1,3 +1,15 @@
+# Оглавление
+
+- [Краткое описание изначального задания](#pymongo-api)
+- [Главная цель заданий этого спринта](#главная-цель-заданий-этого-спринта)
+- [Скрипт для облегчения жизни с выполнением и проверкой](#sprint2sh)
+- [Задание 1](mongo-single/README.md)
+- [Задание 2](mongo-sharding/README.md)
+- [Задание 3](mongo-sharding-repl/README.md)
+- [Задание 4](sharding-repl-cache/README.md)
+- [Задание 5](sharding-repl-cache-apisix/README.md)
+- [Задание 6](sharding-repl-cache-cdn/README.md)
+
 # pymongo-api
 
 ## Как запустить
@@ -52,7 +64,9 @@ curl --silent http://ifconfig.me
 будем выполнять нагрузочный тест с помощью инструмента ```siege```, который
 умеет делать запросы по списку URL из файла, а этот файл будет сформирован
 таким образом, чтобы запросы были распределены по всем участникам каждой
-новой конфигурации.
+новой конфигурации. Наши нагрузочные тесты не будут супер научными с определением
+перценталей. Будет учитываться просто 1 запуск с протяженностью в 1 минуту на
+каждый из тестов.
 
 ## sprint2.sh
 
@@ -60,7 +74,7 @@ curl --silent http://ifconfig.me
 ```
 $ ./sprint2.sh -h
 Usage:
-  ./sprint2.sh -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r num_doc] [-s]
+  ./sprint2.sh -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r <num_doc>] [-s <num_doc>]
 Where
   -t task_num -            task number from this sprint (1..6)
   -m mode     - (optional) containers' mode (one of 'up' or 'down')

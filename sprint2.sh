@@ -24,19 +24,27 @@ CONFIG_SRV=configSrv
 ROUTER_SRV=mongos_router
 SHARD1_SRV=shard1
 SHARD2_SRV=shard2
+SHARD1A_SRV=shard1a
+SHARD1B_SRV=shard1b
+SHARD2A_SRV=shard2a
+SHARD2B_SRV=shard2b
 
 # Could use yq here, but there is no guarantee that everyone has it
 ROUTER_PORT=27017
 SHARD1_PORT=27018
 SHARD2_PORT=27019
 CONFIG_PORT=27020
+SHARD1A_PORT=27028
+SHARD1B_PORT=27038
+SHARD2A_PORT=27029
+SHARD2B_PORT=27039
 
 TOP_URL="http://127.0.0.1:8080"
 
 
 function usage() {
     echo "Usage:"
-    echo "  $0 -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r num_doc] [-s]"
+    echo "  $0 -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r <num_doc>] [-s <num_doc>]"
     echo "Where"
     echo "  -t task_num -            task number from this sprint (1..6)"
     echo "  -m mode     - (optional) containers' mode (one of 'up' or 'down')"
@@ -76,6 +84,23 @@ function stop_containers() {
 function list_containers() {
     echo "This compose.yaml defines following containers:"
     grep "container_name" ${TASK_DIR}/compose.yaml | awk -F: '{print $2}'
+
+    [ "$TASK" == "1" ] && return
+
+    cd $TASK_DIR
+    echo "Replicaset status"
+    echo "On ${SHARD1_SRV}..."
+    docker compose exec -T $SHARD1_SRV mongosh --port $SHARD1_PORT --quiet <<- EOF
+        var prompt=">"
+        rs.status().members.forEach( function (z) { print(z.name + ' -> ' + z.stateStr) } )
+EOF
+    echo
+    echo "On ${SHARD2_SRV}..."
+    docker compose exec -T $SHARD2_SRV mongosh --port $SHARD2_PORT --quiet <<- EOF
+        var prompt=">"
+        rs.status().members.forEach( function (z) { print(z.name + ' -> ' + z.stateStr) } )
+EOF
+    cd - > /dev/null
 }
 
 
@@ -84,28 +109,36 @@ function init_db_config() {
     docker ps
     [ "$TASK" == "1" ] && return
 
+    if [ "$TASK" == "2" ]; then
+        SHARD1_MEMBERS="{ _id : 0, host : \"$SHARD1_SRV:$SHARD1_PORT\" }"
+        SHARD2_MEMBERS="{ _id : 1, host : \"$SHARD2_SRV:$SHARD2_PORT\" }"
+        SHARD1_LIST="$SHARD1_SRV/$SHARD1_SRV:$SHARD1_PORT"
+        SHARD2_LIST="$SHARD2_SRV/$SHARD2_SRV:$SHARD2_PORT"
+    else
+        SHARD1_MEMBERS="{ _id : 0, host : \"$SHARD1_SRV:$SHARD1_PORT\" },{ _id : 1, host : \"$SHARD1A_SRV:$SHARD1A_PORT\" },{ _id : 2, host : \"$SHARD1B_SRV:$SHARD1B_PORT\" }"
+        SHARD2_MEMBERS="{ _id : 3, host : \"$SHARD2_SRV:$SHARD2_PORT\" },{ _id : 4, host : \"$SHARD2A_SRV:$SHARD2A_PORT\" },{ _id : 5, host : \"$SHARD2B_SRV:$SHARD2B_PORT\" }"
+        SHARD1_LIST="$SHARD1_SRV/$SHARD1_SRV:$SHARD1_PORT,$SHARD1A_SRV:$SHARD1A_PORT,$SHARD1B_SRV:$SHARD1B_PORT"
+        SHARD2_LIST="$SHARD2_SRV/$SHARD2_SRV:$SHARD2_PORT,$SHARD2A_SRV:$SHARD2A_PORT,$SHARD2B_SRV:$SHARD2B_PORT"
+    fi
+
     cd $TASK_DIR
     docker compose exec -T $CONFIG_SRV mongosh --port $CONFIG_PORT --quiet > /dev/null <<- EOF
         rs.initiate(
             {
                 _id : "$CONFIG_NAME",
                 configsvr: true,
-                members: [
-                    { _id : 0, host : "$CONFIG_SRV:$CONFIG_PORT" }
-                ]
+                members: [ { _id : 0, host : "$CONFIG_SRV:$CONFIG_PORT" } ]
             }
         );
 EOF
     echo "Give few seconds to $CONFIG_SRV to digest the change in its config..."
     sleep 10
+
     docker compose exec -T $SHARD1_SRV mongosh --port $SHARD1_PORT --quiet > /dev/null <<- EOF
         rs.initiate(
             {
                 _id : "$SHARD1_SRV",
-                members: [
-                    { _id : 0, host : "$SHARD1_SRV:$SHARD1_PORT" },
-                    // { _id : 1, host : "$SHARD2_SRV:$SHARD2_PORT" }
-                ]
+                members: [ $SHARD1_MEMBERS ]
             }
         );
         use $DB_NAME;
@@ -115,18 +148,15 @@ EOF
         rs.initiate(
             {
                 _id : "$SHARD2_SRV",
-                members: [
-                    //{ _id : 0, host : "$SHARD1_SRV:$SHARD1_PORT" },
-                    { _id : 1, host : "$SHARD2_SRV:$SHARD2_PORT" }
-                ]
+                members: [ $SHARD2_MEMBERS ]
             }
         );
         use $DB_NAME;
         db.dropDatabase()
 EOF
     docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT > /dev/null <<- EOF
-        sh.addShard( "$SHARD1_SRV/$SHARD1_SRV:$SHARD1_PORT");
-        sh.addShard( "$SHARD2_SRV/$SHARD2_SRV:$SHARD2_PORT");
+        sh.addShard("$SHARD1_LIST");
+        sh.addShard("$SHARD2_LIST");
 
         sh.enableSharding("$DB_NAME");
         sh.shardCollection("$DB_NAME.$COLLECTION_NAME", { "name" : "hashed" } )
