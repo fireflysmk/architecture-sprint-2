@@ -112,31 +112,21 @@ Done
 
 Список всех реплик:
 ```
-$ ./sprint2.sh -t 3 -l
+$ ./sprint2.sh -t 3 -w rs_status
 Executing Task #3, working directory 'mongo-sharding-repl'
-This compose.yaml defines following containers:
- pymongo_api
- configSrv
- mongos_router
- shard1
- shard1a
- shard1b
- shard2
- shard2a
- shard2b
 Replicaset status
 On shard1...
 shard1 [direct: secondary] test>
 >shard1:27018 -> SECONDARY
-shard1a:27028 -> PRIMARY
-shard1b:27038 -> SECONDARY
+shard1a:27028 -> SECONDARY
+shard1b:27038 -> PRIMARY
 
 >
 On shard2...
 shard2 [direct: secondary] test>
 >shard2:27019 -> SECONDARY
-shard2a:27029 -> PRIMARY
-shard2b:27039 -> SECONDARY
+shard2a:27029 -> SECONDARY
+shard2b:27039 -> PRIMARY
 
 >Done
 ```
@@ -159,6 +149,83 @@ This collection has  2000  documents in total
 This collection has  1016  documents on  shard1
 This collection has  984  documents on  shard2
 Done
+```
+
+Проверим статус шардинга на сервере mongos_router:
+```
+$ ./sprint2.sh -t 3 -w sh_status
+Executing Task #3, working directory 'mongo-sharding-repl'
+Cheking status of sharding in the Mongo cluster at mongos_router...
+[direct: mongos] test> shardingVersion
+{ _id: 1, clusterId: ObjectId('67133cee033a81de4b213e77') }
+---
+shards
+[
+  {
+    _id: 'shard1',
+    host: 'shard1/shard1:27018,shard1a:27028,shard1b:27038',
+    state: 1,
+    topologyTime: Timestamp({ t: 1729314053, i: 9 }),
+    replSetConfigVersion: Long('-1')
+  },
+  {
+    _id: 'shard2',
+    host: 'shard2/shard2:27019,shard2a:27029,shard2b:27039',
+    state: 1,
+    topologyTime: Timestamp({ t: 1729314054, i: 15 }),
+    replSetConfigVersion: Long('-1')
+  }
+]
+---
+active mongoses
+[ { '8.0.1': 1 } ]
+---
+autosplit
+{ 'Currently enabled': 'yes' }
+---
+balancer
+{
+  'Currently enabled': 'yes',
+  'Currently running': 'no',
+  'Failed balancer rounds in last 5 attempts': 0,
+  'Migration Results for the last 24 hours': 'No recent migrations'
+}
+---
+databases
+[
+  {
+    database: { _id: 'config', primary: 'config', partitioned: true },
+    collections: {}
+  },
+  {
+    database: {
+      _id: 'somedb',
+      primary: 'shard1',
+      version: {
+        uuid: UUID('4383fc3a-5653-4e6f-808b-f8dcaa853df2'),
+        timestamp: Timestamp({ t: 1729314055, i: 2 }),
+        lastMod: 1
+      }
+    },
+    collections: {
+      'somedb.helloDoc': {
+        shardKey: { name: 'hashed' },
+        unique: false,
+        balancing: true,
+        chunkMetadata: [
+          { shard: 'shard1', nChunks: 1 },
+          { shard: 'shard2', nChunks: 1 }
+        ],
+        chunks: [
+          { min: { name: MinKey() }, max: { name: Long('0') }, 'on shard': 'shard2', 'last modified': Timestamp({ t: 1, i: 0 }) },
+          { min: { name: Long('0') }, max: { name: MaxKey() }, 'on shard': 'shard1', 'last modified': Timestamp({ t: 1, i: 1 }) }
+        ],
+        tags: []
+      }
+    }
+  }
+]
+[direct: mongos] test> Done
 ```
 
 Выберем несколько документов с каждого шарда (это действие одновременно

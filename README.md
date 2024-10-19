@@ -73,17 +73,23 @@ curl --silent http://ifconfig.me
 Этот скрипт будет использоваться для выполнения и проверки заданий этого спринта.
 ```
 $ ./sprint2.sh -h
+
 Usage:
-  ./sprint2.sh -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r <num_doc>] [-s <num_doc>]
+  ./sprint2.sh -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-r <num_doc>] [-s <num_doc>] [-w <what_is>]
 Where
   -t task_num -            task number from this sprint (1..6)
-  -m mode     - (optional) containers' mode (one of 'up' or 'down')
+  -m mode     - (optional) containers' mode (one of 'start' or 'stop')
   -b seconds  - (optional) conduct benchmarks with duration of specified number of seconds
   -c          - (optional) count number of documents in DB
   -i          - (optional) init DB configuration
-  -l          - (optional) list container names
   -r num_doc  - (optional) recreate collection with num_doc documents
   -s num_doc  - (optional) select num_doc from each shard for better benchmarking
+  -w what_is  - (optional) get an answer for 'what is'-kind of question
 
   -h          - (optional) this help
+
+Supported 'what is'-kind of questions:
+  rs_status   - replica set(s) status
+  sh_status   - sharding status, according to router_server
+
 ```

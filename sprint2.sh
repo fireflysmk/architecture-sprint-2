@@ -7,8 +7,8 @@ MODE=""
 BENCHMARK=0
 COUNT=0
 SELECT=0
-LIST_CONTAINERS=0
 INIT_COLLECTION=""
+WHAT_IS=""
 
 AB=`which ab`
 SIEGE=`which siege`
@@ -43,19 +43,25 @@ TOP_URL="http://127.0.0.1:8080"
 
 
 function usage() {
+    echo
     echo "Usage:"
-    echo "  $0 -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r <num_doc>] [-s <num_doc>]"
+    echo "  $0 -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-r <num_doc>] [-s <num_doc>] [-w <what_is>]"
     echo "Where"
     echo "  -t task_num -            task number from this sprint (1..6)"
     echo "  -m mode     - (optional) containers' mode (one of 'start' or 'stop')"
     echo "  -b seconds  - (optional) conduct benchmarks with duration of specified number of seconds"
     echo "  -c          - (optional) count number of documents in DB"
     echo "  -i          - (optional) init DB configuration"
-    echo "  -l          - (optional) list container names"
     echo "  -r num_doc  - (optional) recreate collection with num_doc documents"
     echo "  -s num_doc  - (optional) select num_doc from each shard for better benchmarking"
+    echo "  -w what_is  - (optional) get an answer for 'what is'-kind of question"
     echo
     echo "  -h          - (optional) this help"
+    echo
+    echo "Supported 'what is'-kind of questions:"
+    echo "  rs_status   - replica set(s) status"
+    echo "  sh_status   - sharding status, according to router_server"
+    echo
 }
 
 
@@ -77,29 +83,6 @@ function stop_containers() {
     echo "Stopping containers..."
     cd $TASK_DIR
     docker compose down
-    cd - > /dev/null
-}
-
-
-function list_containers() {
-    echo "This compose.yaml defines following containers:"
-    grep "container_name" ${TASK_DIR}/compose.yaml | awk -F: '{print $2}'
-
-    [ "$TASK" == "1" ] && return
-
-    cd $TASK_DIR
-    echo "Replicaset status"
-    echo "On ${SHARD1_SRV}..."
-    docker compose exec -T $SHARD1_SRV mongosh --port $SHARD1_PORT --quiet <<- EOF
-        var prompt=">"
-        rs.status().members.forEach( function (z) { print(z.name + ' -> ' + z.stateStr) } )
-EOF
-    echo
-    echo "On ${SHARD2_SRV}..."
-    docker compose exec -T $SHARD2_SRV mongosh --port $SHARD2_PORT --quiet <<- EOF
-        var prompt=">"
-        rs.status().members.forEach( function (z) { print(z.name + ' -> ' + z.stateStr) } )
-EOF
     cd - > /dev/null
 }
 
@@ -250,6 +233,34 @@ EOF`
 }
 
 
+function rs_status() {
+    cd $TASK_DIR
+    echo "Replicaset status"
+    echo "On ${SHARD1_SRV}..."
+    docker compose exec -T $SHARD1_SRV mongosh --port $SHARD1_PORT --quiet <<- EOF
+        var prompt=">"
+        rs.status().members.forEach( function (z) { print(z.name + ' -> ' + z.stateStr) } )
+EOF
+    echo
+    echo "On ${SHARD2_SRV}..."
+    docker compose exec -T $SHARD2_SRV mongosh --port $SHARD2_PORT --quiet <<- EOF
+        var prompt=">"
+        rs.status().members.forEach( function (z) { print(z.name + ' -> ' + z.stateStr) } )
+EOF
+    cd - > /dev/null
+}
+
+
+function sh_status() {
+    echo "Cheking status of sharding in the Mongo cluster at ${ROUTER_SRV}..."
+    cd $TASK_DIR
+    docker compose exec -T $ROUTER_SRV mongosh --port $ROUTER_PORT --quiet <<- EOF
+        sh.status();
+EOF
+    cd - > /dev/null
+}
+
+
 function benchmark() {
     echo "Benchmarking..."
     URL1=$TOP_URL/
@@ -283,7 +294,7 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-while getopts ":t:m:b:chilr:s:" opt; do
+while getopts ":t:m:b:chir:s:w:" opt; do
     case ${opt} in
         b) # benchmark
             BENCHMARK=1
@@ -299,9 +310,6 @@ while getopts ":t:m:b:chilr:s:" opt; do
         i) # init db config
             INIT_DB_CONFIG=1
             ;;
-        l) # list container names
-            LIST_CONTAINERS=1
-            ;;
         m) # mode
             MODE=${OPTARG}
             ;;
@@ -314,8 +322,12 @@ while getopts ":t:m:b:chilr:s:" opt; do
         t) # task
             TASK=${OPTARG}
             ;;
+        w) # 'what is' question
+            WHAT_IS=${OPTARG}
+            ;;
         :)
             echo "Option -${OPTARG} requires an argument"
+            usage
             exit 1
             ;;
         ?)
@@ -352,8 +364,17 @@ echo "Executing Task #${TASK}, working directory '${TASK_DIR}'"
 [ "a$INIT_COLLECTION" != "a" ] && init_collection
 [ "$COUNT" == "1" ]            && count_documents
 [ "$BENCHMARK" == "1" ]        && benchmark
-[ "$LIST_CONTAINERS" == "1" ]  && list_containers
 [ "$SELECT" != "0" ]           && select_data
+if [ "a$WHAT_IS" != "a" ]; then
+    case $WHAT_IS in
+        rs_status)
+            rs_status
+            ;;
+        sh_status)
+            sh_status
+            ;;
+    esac
+fi
 
 echo "Done"
 exit 0

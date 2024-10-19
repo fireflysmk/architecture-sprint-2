@@ -96,14 +96,8 @@ Done
 
 Список всех реплик:
 ```
-$ ./sprint2.sh -t 2 -l
+$ ./sprint2.sh -t 2 -w rs_status
 Executing Task #2, working directory 'mongo-sharding'
-This compose.yaml defines following containers:
- pymongo_api
- configSrv
- mongos_router
- shard1
- shard2
 Replicaset status
 On shard1...
 shard1 [direct: primary] test>
@@ -135,6 +129,95 @@ This collection has  2000  documents in total
 This collection has  1016  documents on  shard1
 This collection has  984  documents on  shard2
 Done
+```
+
+Проверим статус шардинга на сервере mongos_router:
+```
+$ ./sprint2.sh -t 2 -w sh_status
+Executing Task #2, working directory 'mongo-sharding'
+Cheking status of sharding in the Mongo cluster at configSrv...
+config_server [direct: primary] test> Warning: MongoshWarning: [SHAPI-10003] You are not connected to a mongos. This command may not work as expected.
+shardingVersion
+{ _id: 1, clusterId: ObjectId('67132b0c3e0759b3538bf573') }
+---
+shards
+[
+  {
+    _id: 'shard1',
+    host: 'shard1/shard1:27018',
+    state: 1,
+    topologyTime: Timestamp({ t: 1729309463, i: 10 }),
+    replSetConfigVersion: Long('-1')
+  },
+  {
+    _id: 'shard2',
+    host: 'shard2/shard2:27019',
+    state: 1,
+    topologyTime: Timestamp({ t: 1729309464, i: 9 }),
+    replSetConfigVersion: Long('-1')
+  }
+]
+---
+active mongoses
+[ { '8.0.1': 1 } ]
+---
+autosplit
+{ 'Currently enabled': 'yes' }
+---
+balancer
+{
+  'Currently running': 'unknown',
+  'Currently enabled': 'yes',
+  'Failed balancer rounds in last 5 attempts': 0,
+  'Migration Results for the last 24 hours': 'No recent migrations'
+}
+---
+databases
+[
+  {
+    database: { _id: 'config', primary: 'config', partitioned: true },
+    collections: {
+      'config.system.sessions': {
+        shardKey: { _id: 1 },
+        unique: false,
+        balancing: true,
+        chunkMetadata: [ { shard: 'shard1', nChunks: 1 } ],
+        chunks: [
+          { min: { _id: MinKey() }, max: { _id: MaxKey() }, 'on shard': 'shard1', 'last modified': Timestamp({ t: 1, i: 0 }) }
+        ],
+        tags: []
+      }
+    }
+  },
+  {
+    database: {
+      _id: 'somedb',
+      primary: 'shard1',
+      version: {
+        uuid: UUID('e86d7816-50b3-40a4-b855-be70c5d32623'),
+        timestamp: Timestamp({ t: 1729309464, i: 26 }),
+        lastMod: 1
+      }
+    },
+    collections: {
+      'somedb.helloDoc': {
+        shardKey: { name: 'hashed' },
+        unique: false,
+        balancing: true,
+        chunkMetadata: [
+          { shard: 'shard1', nChunks: 1 },
+          { shard: 'shard2', nChunks: 1 }
+        ],
+        chunks: [
+          { min: { name: MinKey() }, max: { name: Long('0') }, 'on shard': 'shard2', 'last modified': Timestamp({ t: 1, i: 0 }) },
+          { min: { name: Long('0') }, max: { name: MaxKey() }, 'on shard': 'shard1', 'last modified': Timestamp({ t: 1, i: 1 }) }
+        ],
+        tags: []
+      }
+    }
+  }
+]
+config_server [direct: primary] test> Done
 ```
 
 Выберем несколько документов с каждого шарда (это действие одновременно
