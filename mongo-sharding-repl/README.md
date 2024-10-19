@@ -52,7 +52,7 @@ Shortest transaction:           0.00
 
 Запускаем контейнеры:
 ```
-$ ./sprint2.sh -t 3 -m up
+$ ./sprint2.sh -t 3 -m start
 Executing Task #3, working directory 'mongo-sharding-repl'
 Staring containers...
 [+] Running 18/18
@@ -219,7 +219,7 @@ Done
 
 Выключаем контейнеры:
 ```
-$ ./sprint2.sh -t 3 -m down
+$ ./sprint2.sh -t 3 -m stop
 Executing Task #3, working directory 'mongo-sharding-repl'
 Stopping containers...
 [+] Running 10/10

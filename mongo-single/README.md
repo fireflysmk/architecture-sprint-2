@@ -48,7 +48,7 @@ Shortest transaction:           0.00
 
 Запускаем контейнеры:
 ```
-$ ./sprint2.sh -t 1 -m up
+$ ./sprint2.sh -t 1 -m start
 Executing Task #1, working directory 'mongo-single'
 Staring containers...
 [+] Running 4/4
@@ -133,7 +133,7 @@ Done
 
 Выключаем контейнеры:
 ```
-$ ./sprint2.sh -t 1 -m down
+$ ./sprint2.sh -t 1 -m stop
 Executing Task #1, working directory 'mongo-single'
 Stopping containers...
 [+] Running 3/3

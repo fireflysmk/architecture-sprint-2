@@ -52,7 +52,7 @@ Shortest transaction:           0.00
 
 Запускаем контейнеры:
 ```
-$ ./sprint2.sh -t 2 -m up
+$ ./sprint2.sh -t 2 -m start
 Executing Task #2, working directory 'mongo-sharding'
 Staring containers...
 [+] Running 10/10
@@ -92,6 +92,29 @@ b3c1a9b4e119   mongo:latest               "docker-entrypoint.s…"   2 minutes a
 a8ee0da5e785   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27019->27019/tcp, :::27019->27019/tcp   shard2
 e73b6f61ff34   mongo:latest               "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes (healthy)   27017/tcp, 0.0.0.0:27020->27020/tcp, :::27020->27020/tcp   configSrv
 Done
+```
+
+Список всех реплик:
+```
+$ ./sprint2.sh -t 2 -l
+Executing Task #2, working directory 'mongo-sharding'
+This compose.yaml defines following containers:
+ pymongo_api
+ configSrv
+ mongos_router
+ shard1
+ shard2
+Replicaset status
+On shard1...
+shard1 [direct: primary] test>
+>shard1:27018 -> PRIMARY
+
+>
+On shard2...
+shard2 [direct: primary] test>
+>shard2:27019 -> PRIMARY
+
+>Done
 ```
 
 Инициализируем данные:
@@ -172,7 +195,7 @@ Done
 
 Выключаем контейнеры:
 ```
-$ ./sprint2.sh -t 2 -m down
+$ ./sprint2.sh -t 2 -m stop
 Executing Task #2, working directory 'mongo-sharding'
 Stopping containers...
 [+] Running 6/6

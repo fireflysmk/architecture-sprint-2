@@ -47,7 +47,7 @@ function usage() {
     echo "  $0 -t <task_num> [-m <mode>] [-h] [-b <seconds>] [-c] [-i] [-l] [-r <num_doc>] [-s <num_doc>]"
     echo "Where"
     echo "  -t task_num -            task number from this sprint (1..6)"
-    echo "  -m mode     - (optional) containers' mode (one of 'up' or 'down')"
+    echo "  -m mode     - (optional) containers' mode (one of 'start' or 'stop')"
     echo "  -b seconds  - (optional) conduct benchmarks with duration of specified number of seconds"
     echo "  -c          - (optional) count number of documents in DB"
     echo "  -i          - (optional) init DB configuration"
@@ -334,7 +334,7 @@ done
 # Validate parameters
 [ "a${TASK}" == "a" ] && error "-t parameter is missing"
 [ ${TASK} -lt 1 -o ${TASK} -gt 6 ] && error "invalid task number, out of range 1..6"
-[ "a${MODE}" != "a" -a "${MODE}" != "up" -a "${MODE}" != "down" ] && error "-m should be supplied with 'up' or 'down'"
+[ "a${MODE}" != "a" -a "${MODE}" != "start" -a "${MODE}" != "stop" ] && error "-m should be supplied with 'start' or 'stop'"
 [ "$BENCHMARK" == "1" -a "a${MODE}" != "a" ] && error "Can't specify -b and -m at the same time"
 [ "$COUNT" == "1" -a "a${MODE}" != "a" ] && error "Can't specify -c and -m at the same time"
 [ "a$INIT_COLLECTION" != "a" -a "a${MODE}" != "a" ] && error "Can't specify -r and -m at the same time"
@@ -346,8 +346,8 @@ done
 TASK_DIR=${TASK_DIRS[$(($TASK-1))]}
 echo "Executing Task #${TASK}, working directory '${TASK_DIR}'"
 
-[ "$MODE" == "up" ]            && start_containers
-[ "$MODE" == "down" ]          && stop_containers
+[ "$MODE" == "start" ]         && start_containers
+[ "$MODE" == "stop" ]          && stop_containers
 [ "a$INIT_DB_CONFIG" != "a" ]  && init_db_config
 [ "a$INIT_COLLECTION" != "a" ] && init_collection
 [ "$COUNT" == "1" ]            && count_documents
