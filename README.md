@@ -9,7 +9,7 @@
 - [Задание 3](mongo-sharding-repl/README.md)
 - [Задание 4](sharding-repl-cache/README.md)
 - [Задание 5](sharding-repl-cache-apisix/README.md)
-- [Задание 6](sharding-repl-cache-cdn/README.md)
+
 
 # pymongo-api
 
