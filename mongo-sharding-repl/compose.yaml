@@ -1,0 +1,244 @@
+name: mongo-sharding-repl
+
+x-common: &commonSettings
+  image: mongo:latest
+  restart: always
+  networks:
+    app-network:
+  healthcheck:
+    interval: 5s
+    start_period: 10s
+
+services:
+  # app server
+  pymongo_api:
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    image: kazhem/pymongo_api:1.0.0
+    depends_on: [mongos_router]
+    ports:
+      - 8080:8080
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.5
+    environment:
+      MONGODB_URL: "mongodb://mongos_router:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+
+  # Config Servers Replica Set
+  config1:
+    <<: *commonSettings
+    hostname: config1
+    ports:
+      - 27017:27017
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.10
+    volumes:
+      - config1-data:/data/db
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "configReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+
+  config2:
+    <<: *commonSettings
+    hostname: config2
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.11
+    volumes:
+      - config2-data:/data/db
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "configReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+
+  config3:
+    <<: *commonSettings
+    hostname: config3
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.12
+    volumes:
+      - config3-data:/data/db
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "configReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+
+  # mongos router
+  mongos_router:
+    <<: *commonSettings
+    hostname: mongos_router
+    ports:
+      - 27020:27020
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.7
+    volumes:
+      - router-data:/data/db
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "configReplSet/config1:27017,config2:27017,config3:27017",
+        "--bind_ip_all",
+        "--port",
+        "27020"
+      ]
+
+  # Shard 1 Replica Set
+  shard1a:
+    <<: *commonSettings
+    hostname: shard1a
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.20
+    volumes:
+      - shard1a-data:/data/db
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard1ReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+
+  shard1b:
+    <<: *commonSettings
+    hostname: shard1b
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.21
+    volumes:
+      - shard1b-data:/data/db
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard1ReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+
+  shard1c:
+    <<: *commonSettings
+    hostname: shard1c
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.22
+    volumes:
+      - shard1c-data:/data/db
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard1ReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+
+  # Shard 2 Replica Set
+  shard2a:
+    <<: *commonSettings
+    hostname: shard2a
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.30
+    volumes:
+      - shard2a-data:/data/db
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard2ReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+
+  shard2b:
+    <<: *commonSettings
+    hostname: shard2b
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.31
+    volumes:
+      - shard2b-data:/data/db
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard2ReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+
+  shard2c:
+    <<: *commonSettings
+    hostname: shard2c
+    networks:
+      app-network:
+        ipv4_address: 172.18.0.32
+    volumes:
+      - shard2c-data:/data/db
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard2ReplSet",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/16
+
+volumes:
+  config1-data:
+  config2-data:
+  config3-data:
+  router-data:
+  shard1a-data:
+  shard1b-data:
+  shard1c-data:
+  shard2a-data:
+  shard2b-data:
+  shard2c-data:
