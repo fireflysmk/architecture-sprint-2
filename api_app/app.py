@@ -1,25 +1,27 @@
-import json
-import logging
-import os
-import time
-from typing import List, Optional
-
+from typing import Optional, List
+import time 
+from fastapi import FastAPI, Body, HTTPException, status
+from pydantic import ConfigDict, BaseModel, Field, EmailStr
+from pydantic.functional_validators import BeforeValidator
+from pymongo import errors
 import motor.motor_asyncio
-from bson import ObjectId
-from fastapi import Body, FastAPI, HTTPException, status
+
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 from fastapi_cache.decorator import cache
-from logmiddleware import RouterLoggingMiddleware, logging_config
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from pydantic.functional_validators import BeforeValidator
-from pymongo import errors
 from redis import asyncio as aioredis
+from logmiddleware import RouterLoggingMiddleware, logging_config
+
+import os
+import logging
+import json
 from typing_extensions import Annotated
+from bson import ObjectId
+
 
 # Configure JSON logging
 logging.config.dictConfig(logging_config)
-logger = logging.getLogger(__name__)
+logger=logging.getLogger(__name__)
 
 app = FastAPI()
 app.add_middleware(
@@ -31,12 +33,18 @@ DATABASE_URL = os.environ["MONGODB_URL"]
 DATABASE_NAME = os.environ["MONGODB_DATABASE_NAME"]
 REDIS_URL = os.getenv("REDIS_URL", None)
 
+# DATABASE_URL = "mongodb://127.0.0.1/"
+# DATABASE_NAME = "somedb"
+# REDIS_URL = "redis://localhost:6379"
+# REDIS_URL = ""
+
+
 
 def nocache(*args, **kwargs):
     def decorator(func):
         return func
-
     return decorator
+
 
 
 if REDIS_URL:
@@ -53,6 +61,7 @@ db = client[DATABASE_NAME]
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
+
 @app.on_event("startup")
 async def startup():
     if REDIS_URL:
@@ -64,7 +73,6 @@ class UserModel(BaseModel):
     """
     Container for a single user record.
     """
-
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     age: int = Field(...)
     name: str = Field(...)
@@ -84,14 +92,14 @@ async def root():
     collections = {}
     for collection_name in collection_names:
         collection = db.get_collection(collection_name)
-        collections[collection_name] = {
-            "documents_count": await collection.count_documents({})
-        }
+        collections[collection_name] = {"documents_count": await collection.count_documents({})}
     try:
-        replica_status = await client.admin.command("replSetGetStatus")
+        replica_status = await client.admin.command('replSetGetStatus')
         replica_status = json.dumps(replica_status, indent=2, default=str)
     except errors.OperationFailure:
         replica_status = "No Replicas"
+
+    
 
     topology_description = client.topology_description
     read_preference = client.client_options.read_preference
@@ -100,31 +108,31 @@ async def root():
 
     shards = None
     if topology_type == "Sharded":
-        shards_list = await client.admin.command("listShards")
+        shards_list = await client.admin.command('listShards')
         shards = {}
-        for shard in shards_list.get("shards", {}):
+        for shard in shards_list.get('shards', {}):
             shards[shard["_id"]] = shard["host"]
-
+    
     cache_enabled = False
     if REDIS_URL:
         cache_enabled = FastAPICache.get_enable()
-
+    
     return {
-        "mongo_topology_type": topology_type,
-        "mongo_replicaset_name": replicaset_name,
-        "mongo_db": DATABASE_NAME,
-        "read_preference": str(read_preference),
-        "mongo_nodes": client.nodes,
-        "mongo_primary_host": client.primary,
-        "mongo_secondary_hosts": client.secondaries,
-        "mongo_address": client.address,
-        "mongo_is_primary": client.is_primary,
-        "mongo_is_mongos": client.is_mongos,
-        "collections": collections,
-        "shards": shards,
-        "cache_enabled": cache_enabled,
-        "status": "OK",
-    }
+            "mongo_topology_type": topology_type,
+            "mongo_replicaset_name": replicaset_name,
+            "mongo_db": DATABASE_NAME,
+            "read_preference": str(read_preference),
+            "mongo_nodes": client.nodes,
+            "mongo_primary_host": client.primary,
+            "mongo_secondary_hosts": client.secondaries,
+            "mongo_address": client.address,
+            "mongo_is_primary": client.is_primary,
+            "mongo_is_mongos": client.is_mongos,
+            "collections": collections,
+            "shards": shards,
+            "cache_enabled": cache_enabled,
+            "status": "OK",
+            }
 
 
 @app.get("/{collection_name}/count")
@@ -133,7 +141,10 @@ async def collection_count(collection_name: str):
     items_count = await collection.count_documents({})
     # status = await client.admin.command('replSetGetStatus')
     # import ipdb; ipdb.set_trace()
-    return {"status": "OK", "mongo_db": DATABASE_NAME, "items_count": items_count}
+    return {"status": "OK",
+            "mongo_db": DATABASE_NAME,
+            "items_count": items_count}
+
 
 
 @app.get(
@@ -142,7 +153,7 @@ async def collection_count(collection_name: str):
     response_model=UserCollection,
     response_model_by_alias=False,
 )
-@cache(expire=60 * 1)
+@cache(expire=60*1)
 async def list_users(collection_name: str):
     """
     List all of the user data in the database.
@@ -153,19 +164,23 @@ async def list_users(collection_name: str):
     return UserCollection(users=await collection.find().to_list(1000))
 
 
+
 @app.get(
     "/{collection_name}/users/{name}",
     response_description="Get a single user",
     response_model=UserModel,
     response_model_by_alias=False,
 )
+
 async def show_user(collection_name: str, name: str):
     """
     Get the record for a specific user, looked up by `name`.
     """
-
+    
     collection = db.get_collection(collection_name)
-    if (user := await collection.find_one({"name": name})) is not None:
+    if (
+        user := await collection.find_one({"name": name})
+    ) is not None:
         return user
 
     raise HTTPException(status_code=404, detail=f"User {name} not found")
@@ -178,6 +193,7 @@ async def show_user(collection_name: str, name: str):
     status_code=status.HTTP_201_CREATED,
     response_model_by_alias=False,
 )
+
 async def create_user(collection_name: str, user: UserModel = Body(...)):
     """
     Insert a new user record.
@@ -188,5 +204,9 @@ async def create_user(collection_name: str, user: UserModel = Body(...)):
     new_user = await collection.insert_one(
         user.model_dump(by_alias=True, exclude=["id"])
     )
-    created_user = await collection.find_one({"_id": new_user.inserted_id})
+    created_user = await collection.find_one(
+        {"_id": new_user.inserted_id}
+    )
     return created_user
+
+
