@@ -43,13 +43,14 @@
 	а) - В папке api_app в файле requirements была добавлена зависимость redis-py-cluster[asyncio]==2.1.3
 		И для ее совместимости была понижена версия  redis , а именно "redis==3.5.3"
 	б) - Также в самом файле был изменен код проверки присутсвия поля REDIS_URL с
+
 	if REDIS_URL:
 		cache = cache
 	else:
 		cache = nocache
 		
-	на 
-	
+	Был заменен на: 
+ 
 	if REDIS_URL:
 		cache = cache
 		redis_urls_list = REDIS_URLS.split(",")
@@ -57,7 +58,8 @@
 		FastAPICache.init(RedisBackend(redis), prefix="api:cache")
 	else:
 		cache = nocache
-	(К сожалению я не владею python , поэтому этот кусок сгенерировал chatGpt)
+	
+ (К сожалению я не владею python , поэтому этот кусок сгенерировал chatGpt)
   После этого можем проводить необходимые тесты
   1-й запрос идет около 1с , последующие <100мс
   
