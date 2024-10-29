@@ -1,0 +1,106 @@
+services:
+  shard2:
+    image: mongo:latest
+    container_name: shard2
+    restart: always
+    ports:
+      - "27019:27019"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.8
+    volumes:
+      - shard2-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+      
+  shard2-secondary1: 
+    image: mongo:latest
+    container_name: shard2-secondary1
+    restart: always
+    ports:
+      - "27031:27031"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.31
+    volumes:
+      - shard2-secondary1-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27031"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+      
+  shard2-secondary2: 
+    image: mongo:latest
+    container_name: shard2-secondary2
+    restart: always
+    ports:
+      - "27032:27032"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.32
+    volumes:
+      - shard2-secondary2-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27032"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+      
+  shard2-secondary3: 
+    image: mongo:latest
+    container_name: shard2-secondary3
+    restart: always
+    ports:
+      - "27033:27033"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.33
+    volumes:
+      - shard2-secondary3-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27033"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+      
+volumes:
+  shard2-data:
+  shard2-secondary1-data:
+  shard2-secondary2-data:
+  shard2-secondary3-data:
