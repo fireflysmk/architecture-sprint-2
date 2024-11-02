@@ -1,0 +1,345 @@
+version: '3'
+services:
+  configSrv:
+    image: mongo:latest
+    container_name: configSrv
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.10
+    volumes:
+      - config-data:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+    healthcheck:
+      test: ["CMD","mongo","--eval","db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  masterA:
+    container_name: masterA
+    image: mongo:latest
+    restart: always
+    ports:
+      - "27018:27018"
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.9
+    volumes:
+      - masterA-data:/data/db
+    command:
+     [
+       "--shardsvr",
+       "--replSet",
+       "masterA",
+       "--bind_ip_all",
+       "--port",
+       "27018"
+     ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  replicaA1:
+    image: mongo:latest
+    container_name: replicaA1
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.11
+    volumes:
+      - replicaA1-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "masterA",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+
+  replicaA2:
+    image: mongo:latest
+    container_name: replicaA2
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.12
+    volumes:
+      - replicaA2-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "masterA",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+
+  replicaA3:
+    image: mongo:latest
+    container_name: replicaA3
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.13
+    volumes:
+      - replicaA3-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "masterA",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+
+  masterB:
+    container_name: masterB
+    image: mongo:latest
+    restart: always
+    ports:
+      - "27019:27019"
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.8
+    volumes:
+      - masterB-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "masterB",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+    healthcheck:
+      test: ["CMD","mongo","--eval","db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  replicaB1:
+    image: mongo:latest
+    container_name: replicaB1
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.14
+    volumes:
+      - replicaB1-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "masterB",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+
+  replicaB2:
+    image: mongo:latest
+    container_name: replicaB2
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.15
+    volumes:
+      - replicaB2-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "masterB",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+
+  replicaB3:
+    image: mongo:latest
+    container_name: replicaB3
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.16
+    volumes:
+      - replicaB3-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "masterB",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+
+  mongos_router:
+    image: mongo:latest
+    container_name: mongos_router
+    restart: always
+    ports:
+      - "27020:27020"
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.7
+    command:
+      [
+        "mongos",
+        "--configdb", 
+        "config_server/configSrv:27017",
+        "--bind_ip_all",
+        "--port",
+        "27020"
+      ]
+    healthcheck:
+      test: ["CMD","mongo","--eval","db.adminCommand('ping')"]
+      interval: 5s
+      start_period: 10s
+
+  sharding-repl-cache:
+    container_name: sharding-repl-cache
+    build: 
+      context: api_app
+      dockerfile: Dockerfile
+    image: kazhem/pymongo_api:1.0.0
+    depends_on:
+      - mongos_router
+      - redis_1
+    ports:
+      - 8080:8080
+    environment:
+      MONGODB_URL: "mongodb://mongos_router:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+      REDIS_URL: "redis://173.23.0.2:6379,173.23.0.3:6379,173.23.0.4:6379,173.23.0.5:6379"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://mongos_router:27020"]
+      interval: 30s
+      retries: 5
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.20
+
+  redis_1:
+    image: "redis:latest"
+    container_name: redis_1
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_1_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.2
+
+  redis_2:
+    image: "redis:latest"
+    container_name: redis_2
+    ports:
+      - "6379"
+    volumes:
+      - redis_2_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.3
+
+  redis_3:
+    image: "redis:latest"
+    container_name: redis_3
+    ports:
+      - "6379"
+    volumes:
+      - redis_3_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.4
+
+  redis_4:
+    image: "redis:latest"
+    container_name: redis_4
+    ports:
+      - "6379"
+    volumes:
+      - redis_4_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.5
+
+  redis_5:
+    image: "redis:latest"
+    container_name: redis_5
+    ports:
+      - "6379"
+    volumes:
+      - redis_5_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.6
+
+  redis_6:
+    image: "redis:latest"
+    container_name: redis_6
+    ports:
+      - "6379"
+    volumes:
+      - redis_6_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      app-network:
+        ipv4_address: 173.23.0.17
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 173.23.0.0/16
+
+volumes:
+  config-data:
+
+  masterA-data:
+  replicaA1-data:
+  replicaA2-data:
+  replicaA3-data:
+
+  masterB-data:
+  replicaB1-data:
+  replicaB2-data:
+  replicaB3-data:
+
+  mongos_router:
+  mongo-sharding-repl:
+  
+  redis_1_data: {}
+  redis_2_data: {}
+  redis_3_data: {}
+  redis_4_data: {}
+  redis_5_data: {}
+  redis_6_data: {} 
