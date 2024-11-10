@@ -1,0 +1,8 @@
+rs.initiate(
+    {
+      _id : "shard02",
+      members: [
+        { _id : 1, host : "shard02-a:27201" }
+      ]
+    }
+  );

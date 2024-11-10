@@ -1,0 +1,11 @@
+sh.addShard( "shard01/shard01-a:27101");
+sh.addShard( "shard02/shard02-a:27201");
+
+sh.enableSharding("somedb");
+sh.shardCollection("somedb.helloDoc", { "name" : "hashed" } );
+
+use somedb
+
+for(var i = 0; i < 1000; i++) db.helloDoc.insert({age:i, name:"ly"+i});
+
+db.helloDoc.countDocuments();

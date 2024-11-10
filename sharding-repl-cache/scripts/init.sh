@@ -1,0 +1,1 @@
+docker-compose exec shard01-a sh -c "mongosh < /scripts/init_shard01_repl.sh"
