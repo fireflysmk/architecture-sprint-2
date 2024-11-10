@@ -1,0 +1,9 @@
+rs.initiate(
+  {
+    _id : "configSrv",
+       configsvr: true,
+    members: [
+      { _id : 0, host : "configSrv:27000" }
+    ]
+  }
+);
