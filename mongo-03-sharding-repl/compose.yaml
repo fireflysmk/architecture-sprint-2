@@ -1,0 +1,196 @@
+services:
+  # MONGODB. 
+  # WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!
+
+  mongo_router:
+    container_name: mongo_router
+    platform: linux/amd64
+    image: dh-mirror.gitverse.ru/mongo:4.4.18
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      app-network:
+        ipv4_address: 172.21.0.17
+    command:
+      [
+        "mongos",
+        "--configdb", 
+        "config_server/mongo_config_srv:27018",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+    depends_on:
+      - mongo_shard1
+      - mongo_shard1_replica
+      - mongo_shard2
+      - mongo_shard2_replica
+
+  mongo_config_srv:
+    container_name: mongo_config_srv
+    platform: linux/amd64
+    image: dh-mirror.gitverse.ru/mongo:4.4.18
+    restart: always
+    ports:
+      - "27018:27018"
+    networks:
+      app-network:
+        ipv4_address: 172.21.0.18
+    volumes:
+      - mongo-03-confsrv-data:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ] 
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  mongo_shard1:
+    container_name: mongo_shard1
+    platform: linux/amd64
+    image: dh-mirror.gitverse.ru/mongo:4.4.18
+    restart: always
+    ports:
+      - "27019:27019"
+    networks:
+      app-network:
+        ipv4_address: 172.21.0.19
+    volumes:
+      - mongo-03-shard1-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard1",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+    depends_on:
+      - mongo_config_srv
+
+  mongo_shard1_replica:
+    container_name: mongo_shard1_replica
+    platform: linux/amd64
+    image: dh-mirror.gitverse.ru/mongo:4.4.18
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 172.21.0.20
+    volumes:
+      - mongo-03-shard1-replica-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard1",
+        "--bind_ip_all",
+        "--port",
+        "27020"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  mongo_shard2:
+    container_name: mongo_shard2
+    platform: linux/amd64
+    image: dh-mirror.gitverse.ru/mongo:4.4.18
+    restart: always
+    ports:
+      - "27020:27020"
+    networks:
+      app-network:
+        ipv4_address: 172.21.0.23
+    volumes:
+      - mongo-03-shard2-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27023"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+    depends_on:
+      - mongo_config_srv
+
+  mongo_shard2_replica:
+    container_name: mongo_shard2_replica
+    platform: linux/amd64
+    image: dh-mirror.gitverse.ru/mongo:4.4.18
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 172.21.0.24
+    volumes:
+      - mongo-03-shard2-replica-data:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27024"
+      ]
+    healthcheck:
+      test: [ "CMD", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      start_period: 10s
+
+  # APPLICATION. 
+
+  pymongo_api:
+    platform: linux/amd64
+    container_name: pymongo_api
+    build: 
+      context: api_app
+      dockerfile: Dockerfile
+    image: kazhem/pymongo_api:1.0.0
+    ports:
+      - "8080:8080"
+    networks:
+      app-network:
+    environment:
+      MONGODB_URL: "mongodb://mongo_router"
+      MONGODB_DATABASE_NAME: "somedb"
+    depends_on:
+      - mongo_router
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  mongo-03-confsrv-data:
+  mongo-03-shard1-data:
+  mongo-03-shard1-replica-data:
+  mongo-03-shard2-data:
+  mongo-03-shard2-replica-data:
