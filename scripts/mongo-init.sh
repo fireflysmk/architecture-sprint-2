@@ -52,18 +52,8 @@ mongosh --host mongos_router:27020 --eval 'sh.enableSharding("somedb")'
 
 echo "Создаем коллекцию helloDoc в базе somedb и настраиваем шардинг..."
 mongosh --host mongos_router:27020 --eval '
-use somedb;
-db.createCollection("helloDoc");
+db.getSiblingDB("somedb").createCollection("helloDoc");
+db.getSiblingDB("somedb").helloDoc.createIndex({ "_id": "hashed" });
 sh.shardCollection("somedb.helloDoc", { "_id": "hashed" });
 '
-
-echo "Добавляем данные в коллекцию helloDoc..."
-mongosh --host mongos_router:27020 --eval '
-use somedb;
-for (var i = 0; i < 1000; i++) {
-  db.helloDoc.insertOne({ age: i, name: "user" + i });
-}
-'
-
-echo "Данные добавлены и распределены по шардам!"
 echo "Инициализация и настройка MongoDB завершены!"
