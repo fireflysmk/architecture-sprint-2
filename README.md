@@ -1,35 +1,13 @@
-# pymongo-api
+# Architecture sprint 2
 
-## Как запустить
 
-Запускаем mongodb и приложение
+## Схема
+[Файл схемы](https://drive.google.com/file/d/1-dn46d-6g1rLcKkREvjD9zo4yP7UHN1K/view?usp=sharing)
 
-```shell
-docker compose up -d
-```
+Файл схемы также доступен в репозитории в файле `task1.drawio`
 
-Заполняем mongodb данными
 
-```shell
-./scripts/mongo-init.sh
-```
-
-## Как проверить
-
-### Если вы запускаете проект на локальной машине
-
-Откройте в браузере http://localhost:8080
-
-### Если вы запускаете проект на предоставленной виртуальной машине
-
-Узнать белый ip виртуальной машины
-
-```shell
-curl --silent http://ifconfig.me
-```
-
-Откройте в браузере http://<ip виртуальной машины>:8080
-
-## Доступные эндпоинты
-
-Список доступных эндпоинтов, swagger http://<ip виртуальной машины>:8080/docs
+## Проекты
+- [mongo-sharding](./mongo-sharding/README.md)
+- [mongo-sharding-replication](./mongo-sharding-repl/README.md)
+- [sharding-replication-cache](./sharding-repl-cache/README.md)
